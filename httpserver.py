@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 
-from http.server import BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import socketserver
 import urllib.request
 from http_server_utils import *
@@ -49,6 +49,18 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
             return
 
         else:
+            # self.send_response(200)
+            # self.send_header('Content-type', 'text/html')
+            # self.end_headers()
+            # self.wfile.write(bytes("<html><body><h1>Hello World</h1></body></html>", "utf-8"))
+            #
+            # file = open("example.html", "w")
+            # actual_resource_path = f'{ORIGIN_SERVER}/{self.path[1:]}'
+            # # Write some text to the file
+            # file.write(actual_resource_path)
+            #
+            # # Close the file
+            # file.close()
             try:
                 # actual path to the resource on the Origin server
                 actual_resource_path = f'{ORIGIN_SERVER}/{self.path[1:]}'
@@ -74,7 +86,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
 
             except Exception as e:
                 print("Unble to retrieve data from the origin server. Please request for the resource again")
-                self.send_response(response.status)
+                self.send_response(400)
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
 
@@ -94,7 +106,6 @@ def main(server_port_number):
     with socketserver.TCPServer(("127.0.0.1", server_port_number), ReplicaHTTPServer) as httpd:
         print("serving at port", server_port_number)
         httpd.serve_forever()
-
 
 if __name__ == "__main__":
     # Define the command line arguments
