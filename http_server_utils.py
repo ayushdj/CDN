@@ -46,3 +46,16 @@ def delete_file(file_path: str) -> None:
         file_path: The path to the file.
     """
     os.remove(file_path)
+
+
+def mk_dir(directory: str) -> None:
+    """
+    If the directory exists, we don't create the directory. Otherwise, we create it.
+
+    Args:
+        directory: the directory in the system
+
+    """
+
+    if not os.path.exists(directory):
+        os.makedirs(directory)

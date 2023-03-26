@@ -3,3 +3,4 @@ httpserver:
 
 clean:
 	rm httpserver
+	rm -rf bitbusters_cache
