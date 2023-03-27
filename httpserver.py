@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 import argparse
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
 import socketserver
 import urllib.request
 from http_server_utils import *
-from http_cache import HTTPCache
 import os
 import csv
 
 MY_SERVER_NAME = 'cdn-http4.5700.network'
 ORIGIN_SERVER = 'http://cs5700cdnorigin.ccs.neu.edu:8080'
-# DISK_SIZE_LIMIT = 20000000
-DISK_SIZE_LIMIT = 500000
+DISK_SIZE_LIMIT = 20000000
 
 
 class ReplicaHTTPServer(BaseHTTPRequestHandler):
@@ -22,7 +20,6 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
 
     def __init__(self, request: bytes, client_address: tuple[str, int], server: socketserver.BaseServer):
         super().__init__(request, client_address, server)
-        self.http_cache = HTTPCache()
 
     def _send_information_over(self, response_code, html_string):
         """
@@ -60,33 +57,36 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
             return
 
         else:
-            print("entered outer else block")
             try:
                 # actual path to the resource on the Origin server
                 actual_resource_path = f'http://{ORIGIN_SERVER}/{self.path[1:]}'
 
                 # contact the Origin server for the requested resource
                 with urllib.request.urlopen(actual_resource_path) as response:
-                    # Set the response status code and headers
+                    # Extract the data from te origin server and the headers.
                     data = response.read()
                     headers = response.info()
                     self._send_information_over(response.status, data.decode())
-                    print("entered response block right before if check for disk limit size")
-                    print("THIS IS THE SIZE OF THE CACHE DIRECTORY: ", size_of_cache_directory())
-                    print("This is the size of the incoming data from the origin server: ", headers['Content-Length'])
 
                     # ============================================================================================
 
+                    # we need to cache the data that we just found from the origin server, but if the size of the
+                    # current directory plus the new file size is greater than the disk size limit, we need to remove
+                    # certain files based on priority.
                     if int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
                         with open('pageviews.csv', newline='') as csvfile:
                             CSV_READER = csv.DictReader(csvfile)
                             CSV_READER = list(CSV_READER)
-                            for row in reversed(CSV_READER):
 
+                            # loop over all the rows in the csv, but in reversed order because we want to remove the
+                            # lowest priority files first.
+                            for row in reversed(CSV_READER):
+                                # the csv doesn't have underscores in it, so we need to modify each file name.
                                 row['article'] = row['article'].replace(' ', '_')
 
+                                # find the path for the following file and if it actually exists in our cache, we remove
+                                # the file from our cache.
                                 directory = check_file_in_directory(CACHE_DIRECTORY, row['article'])
-
                                 if directory is not None:
                                     os.remove(f'{current_directory}/{directory}')
 
@@ -94,6 +94,17 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                                     continue
                                 else:
                                     break
+
+                    # even after removing all the least priority files, we still want to make sure that we have the
+                    # space to add our new file. We do this by removing the files that have been in the cache the
+                    # longest
+                    list_of_files = remove_old_files()
+                    i = 0
+                    while i < len(list_of_files) and \
+                            int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
+                        print("removing ", list_of_files[i])
+                        os.remove(list_of_files[i])
+                        i += 1
 
                     # extract the directory path and the name of the file and make the directory.
                     dir_path, file_name = os.path.split(self.path[1:])
@@ -104,13 +115,10 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                         file.write(data)
                         file.close()
 
-
-
             except Exception as e:
-                print("Unble to retrieve data from the origin server. Please request for the resource again")
-                self.send_response(400)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
+                # print("Unble to retrieve data from the origin server. Please request for the resource again")
+                self._send_information_over(400, "<html><body><h1>Unble to retrieve data from the origin server. "
+                                                 "Please request for the resource again</h1></body></html>")
 
 
 def main(server_port_number):
