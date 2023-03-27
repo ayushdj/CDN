@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 import argparse
-
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import socketserver
 import urllib.request
 from http_server_utils import *
 from http_cache import HTTPCache
 import os
+import csv
 
 MY_SERVER_NAME = 'cdn-http4.5700.network'
 ORIGIN_SERVER = 'http://cs5700cdnorigin.ccs.neu.edu:8080'
-DISK_SIZE_LIMIT = 20000000
+# DISK_SIZE_LIMIT = 20000000
+DISK_SIZE_LIMIT = 500000
 
 
 class ReplicaHTTPServer(BaseHTTPRequestHandler):
@@ -59,7 +60,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
             return
 
         else:
-
+            print("entered outer else block")
             try:
                 # actual path to the resource on the Origin server
                 actual_resource_path = f'http://{ORIGIN_SERVER}/{self.path[1:]}'
@@ -69,22 +70,30 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                     # Set the response status code and headers
                     data = response.read()
                     headers = response.info()
-                    print(headers['Content-Length'])
                     self._send_information_over(response.status, data.decode())
+                    print("entered response block right before if check for disk limit size")
+                    print("THIS IS THE SIZE OF THE CACHE DIRECTORY: ", size_of_cache_directory())
+                    print("This is the size of the incoming data from the origin server: ", headers['Content-Length'])
 
                     # ============================================================================================
 
-                    while size_of_cache_directory() + headers['Content-Length'] > DISK_SIZE_LIMIT:
-                        # todo
-                        """
-                        1. determine the size of the cache directory
-                        2.      -> if the size + current file size > limit,
-                                    -> keep removing lowest priority files until there is enough space to hold this new file
-                                    (i.e. until the size of the directory + current file size <= limit)
-                                -> else:
-                                    add the file to the directory
-                        """
+                    if int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
+                        with open('pageviews.csv', newline='') as csvfile:
+                            CSV_READER = csv.DictReader(csvfile)
+                            CSV_READER = list(CSV_READER)
+                            for row in reversed(CSV_READER):
 
+                                row['article'] = row['article'].replace(' ', '_')
+
+                                directory = check_file_in_directory(CACHE_DIRECTORY, row['article'])
+
+                                if directory is not None:
+                                    os.remove(f'{current_directory}/{directory}')
+
+                                if int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
+                                    continue
+                                else:
+                                    break
 
                     # extract the directory path and the name of the file and make the directory.
                     dir_path, file_name = os.path.split(self.path[1:])
@@ -95,7 +104,6 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                         file.write(data)
                         file.close()
 
-                # work on caching the data we just found
 
 
             except Exception as e:

@@ -59,3 +59,16 @@ def mk_dir(directory: str) -> None:
 
     if not os.path.exists(directory):
         os.makedirs(directory)
+
+
+def check_file_in_directory(path_to_file, filename):
+    """
+    Helper function to see if a file exists in a directory. Includes any subdirectories. If the file exists, then
+    we return both the path to the file, and true. otherwise, we return False.
+
+    """
+    for dirpath, dirnames, filenames in os.walk(path_to_file):
+        for file in filenames:
+            if file == filename:
+                return os.path.join(dirpath, filename)
+    return None
