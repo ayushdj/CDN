@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 import argparse
-
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
 import socketserver
 import urllib.request
 from http_server_utils import *
-from http_cache import HTTPCache
 import os
+import csv
 
 MY_SERVER_NAME = 'cdn-http4.5700.network'
 ORIGIN_SERVER = 'http://cs5700cdnorigin.ccs.neu.edu:8080'
-DISK_LIMIT = 20000000
+DISK_SIZE_LIMIT = 20000000
 
 
 class ReplicaHTTPServer(BaseHTTPRequestHandler):
@@ -21,7 +20,20 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
 
     def __init__(self, request: bytes, client_address: tuple[str, int], server: socketserver.BaseServer):
         super().__init__(request, client_address, server)
-        self.http_cache = HTTPCache()
+
+    def _send_information_over(self, response_code, html_string):
+        """
+        Helper method to send information to the client. Put this into a function because
+        the contents of this function are used multiple times.
+
+        Args:
+            response_code: the response code to send over
+            html_string: the response message to send over.
+        """
+        self.send_response(response_code)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(bytes(html_string, "utf-8"))
 
     def do_GET(self):
         """
@@ -34,61 +46,79 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
 
         # if the file we're looking for exists in the disk cache, then pull the data
         # from there, otherwise go to the Origin server and pull the data from there.
-        if does_file_exist(f'{current_directory}/{CACHE_DIRECTORY}/{self.path[1:]}'):
-
+        if does_file_exist(f'{CACHE_DIRECTORY}/{self.path[1:]}'):
             # open the file from the cache
-            with open(f'{current_directory}/{CACHE_DIRECTORY}/{self.path[1:]}', "r") as file:
+            with open(f'{current_directory}/{CACHE_DIRECTORY}/{self.path[1:]}', 'r') as file:
                 file_lines = file.readlines()
 
             # join the string list and send the data back out.
             joined_result = "".join(file_lines)
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            self.wfile.write(joined_result.encode('utf-8'))
+            self._send_information_over(200, joined_result)
             return
 
         else:
-            # self.send_response(200)
-            # self.send_header('Content-type', 'text/html')
-            # self.end_headers()
-            # self.wfile.write(bytes("<html><body><h1>Hello World</h1></body></html>", "utf-8"))
-            #
-            # file = open("example.html", "w")
-            # actual_resource_path = f'{ORIGIN_SERVER}/{self.path[1:]}'
-            # # Write some text to the file
-            # file.write(actual_resource_path)
-            #
-            # # Close the file
-            # file.close()
             try:
                 # actual path to the resource on the Origin server
-                actual_resource_path = f'{ORIGIN_SERVER}/{self.path[1:]}'
+                actual_resource_path = f'http://{ORIGIN_SERVER}/{self.path[1:]}'
 
                 # contact the Origin server for the requested resource
                 with urllib.request.urlopen(actual_resource_path) as response:
-                    # Set the response status code and headers
-                    self.send_response(response.status)
-                    self.send_header('Content-type', 'text/html')
-                    self.end_headers()
-                    self.wfile.write(response.read())
+                    # Extract the data from te origin server and the headers.
+                    data = response.read()
+                    headers = response.info()
+                    self._send_information_over(response.status, data.decode())
 
-                # work on caching the data we just found
-                # todo
-                """
-                1. determine the size of the cache directory
-                2.      -> if the size + current file size > limit,
-                            -> keep removing lowest priority files until there is enough space to hold this new file
-                            (i.e. until the size of the directory + current file size <= limit)
-                        -> else:
-                            add the file to the directory
-                """
+                    # ============================================================================================
+
+                    # we need to cache the data that we just found from the origin server, but if the size of the
+                    # current directory plus the new file size is greater than the disk size limit, we need to remove
+                    # certain files based on priority.
+                    if int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
+                        with open('pageviews.csv', newline='') as csvfile:
+                            CSV_READER = csv.DictReader(csvfile)
+                            CSV_READER = list(CSV_READER)
+
+                            # loop over all the rows in the csv, but in reversed order because we want to remove the
+                            # lowest priority files first.
+                            for row in reversed(CSV_READER):
+                                # the csv doesn't have underscores in it, so we need to modify each file name.
+                                row['article'] = row['article'].replace(' ', '_')
+
+                                # find the path for the following file and if it actually exists in our cache, we remove
+                                # the file from our cache.
+                                directory = check_file_in_directory(CACHE_DIRECTORY, row['article'])
+                                if directory is not None:
+                                    os.remove(f'{current_directory}/{directory}')
+
+                                if int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
+                                    continue
+                                else:
+                                    break
+
+                    # even after removing all the least priority files, we still want to make sure that we have the
+                    # space to add our new file. We do this by removing the files that have been in the cache the
+                    # longest
+                    list_of_files = remove_old_files()
+                    i = 0
+                    while i < len(list_of_files) and \
+                            int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
+                        print("removing ", list_of_files[i])
+                        os.remove(list_of_files[i])
+                        i += 1
+
+                    # extract the directory path and the name of the file and make the directory.
+                    dir_path, file_name = os.path.split(self.path[1:])
+                    mk_dir(f'{CACHE_DIRECTORY}/{dir_path}')
+
+                    with open(f'{CACHE_DIRECTORY}/{self.path[1:]}', "wb") as file:
+                        # Write the content of the file to the file we're creating and close the file out.
+                        file.write(data)
+                        file.close()
 
             except Exception as e:
-                print("Unble to retrieve data from the origin server. Please request for the resource again")
-                self.send_response(400)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
+                # print("Unble to retrieve data from the origin server. Please request for the resource again")
+                self._send_information_over(400, "<html><body><h1>Unble to retrieve data from the origin server. "
+                                                 "Please request for the resource again</h1></body></html>")
 
 
 def main(server_port_number):
@@ -100,12 +130,12 @@ def main(server_port_number):
     """
     # create the cache directory if it doesn't exist, because this is where we
     # store all the cached data.
-    if not os.path.exists(CACHE_DIRECTORY):
-        os.makedirs(CACHE_DIRECTORY)
+    mk_dir(CACHE_DIRECTORY)
 
     with socketserver.TCPServer(("127.0.0.1", server_port_number), ReplicaHTTPServer) as httpd:
         print("serving at port", server_port_number)
         httpd.serve_forever()
+
 
 if __name__ == "__main__":
     # Define the command line arguments

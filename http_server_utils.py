@@ -46,3 +46,55 @@ def delete_file(file_path: str) -> None:
         file_path: The path to the file.
     """
     os.remove(file_path)
+
+
+def mk_dir(directory: str) -> None:
+    """
+    If the directory exists, we don't create the directory. Otherwise, we create it.
+
+    Args:
+        directory: the directory in the system
+
+    """
+
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+
+def check_file_in_directory(path_to_file: str, filename: str) -> str | None:
+    """
+    Helper function to see if a file exists in a directory. Includes any subdirectories. If the file exists, then
+    we return both the path to the file, and true. otherwise, we return False.
+
+    Args:
+        path_to_file: the directory the file we're looking for lives in
+        filename: the name of the file we're looking for
+
+    Returns:
+        a string representing the path of the file if the file we're looking for exists, None otherwise
+    """
+    for dirpath, dirnames, filenames in os.walk(path_to_file):
+        for file in filenames:
+            if file == filename:
+                return os.path.join(dirpath, filename)
+    return None
+
+
+def remove_old_files():
+    """
+    Gets all the files from a directory and sorts them in descending order (oldest file to youngest file).
+
+    Returns:
+        List of all the file names sorted by the date they were created in the cache
+    """
+    # Create a list of all files in the directory and its subdirectories
+    file_list = []
+    for root, dirs, files in os.walk(CACHE_DIRECTORY):
+        for file in files:
+            file_path = os.path.join(root, file)
+            file_list.append(file_path)
+
+    # Sort the list of files based on their creation time, oldest first
+    file_list.sort(key=lambda x: os.path.getctime(x))
+
+    return file_list
