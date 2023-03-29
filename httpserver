@@ -21,7 +21,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
     """
 
     def __init__(self, request: bytes, client_address: Tuple[str, int], server: socketserver.BaseServer):
-        super().__init__(request, client_address, server) # type: ignore
+        super().__init__(request, client_address, server)  # type: ignore
 
     def _send_information_over(self, response_code, html_string):
         """
@@ -45,8 +45,13 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
         """
 
         current_directory = get_current_directory()
-        
+
         filepath = self.path[1:]
+
+        # send 204 if the path has "/grading/beacon"
+        if filepath == 'grading/beacon':
+            self._send_information_over(204, "<html><body><h1>NO CONTENT.</h1></body></html>")
+            return
 
         # if the file we're looking for exists in the disk cache, then pull the data
         # from there, otherwise go to the Origin server and pull the data from there.
@@ -59,7 +64,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
             joined_result = "".join(file_lines)
             self._send_information_over(200, joined_result)
             return
-        
+
         try:
             # actual path to the resource on the Origin server
             actual_resource_path = f'http://{ORIGIN_SERVER}/{filepath}'
@@ -73,15 +78,15 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
 
         except Exception as e:
             # print("Unble to retrieve data from the origin server. Please request for the resource again")
-            self._send_information_over(400, "<html><body><h1>Unble to retrieve data from the origin server. "
-                                                "Please request for the resource again</h1></body></html>")
-                # ============================================================================================
+            self._send_information_over(404, "<html><body><h1>Unble to retrieve data from the origin server. "
+                                             "Please request for the resource again</h1></body></html>")
+            # ============================================================================================
             return
 
         # exit if filepath is empty i.e root / path.
         if not filepath:
             return
-        
+
         # we need to cache the data that we just found from the origin server, but if the size of the
         # current directory plus the new file size is greater than the disk size limit, we need to remove
         # certain files based on priority.
