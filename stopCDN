@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-# Ex: ./stopCDN -p 20200 -o cs5700cdnorigin.ccs.neu.edu  -u bitbusters -n cs5700cdn.example.com -i ~/.ssh/id_rsa
+# Ex: ./stopCDN -p 20200 -o cs5700cdnorigin.ccs.neu.edu:8080  -u bitbusters -n cs5700cdn.example.com -i ~/.ssh/id_rsa
 
 # Include command-line options from cdn_args.sh
 source $(dirname $0)/cdn_args.sh
 
-# Define a function to Stopping http replica servers
+# Helper function to stop http replica servers
 # Usage: stop_httpserver hostname
 function stop_httpserver {
   hostname=$1

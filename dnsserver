@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+'''
+Start: ./dnsserver -p 20200 -n cs5700cdn.example.com
+Testing: dig @127.0.0.1 -p 20200 cs5700cdn.example.com
+'''
+
 import socket
 import argparse
 import sys
@@ -56,7 +61,7 @@ class DNSServer:
 
             # pre-defined IP address to resolve DNS queries
             # Note: This is currently hard coded. Final submission will have find best ip address logic.
-            dns_resolved_ip = "192.168.0.159"
+            dns_resolved_ip = "50.116.39.110"
 
             # the DNS query received from the client
             dns_query = data[0]
