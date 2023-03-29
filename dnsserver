@@ -1,37 +1,236 @@
 #!/usr/bin/env python3
 
 import socket
+import argparse
+import sys
+import struct
+from typing import Optional, Tuple
 
-def handle_dns_request(data):
-    # Parse the DNS request
-    transaction_id = data[0:2]
-    flags = data[2:4]
-    qdcount = data[4:6]
-    qname = data[12:-4].decode('utf-8')
-    
-    # Generate the DNS response dynamically
-    response_ip = "192.168.0.156"
-    response = transaction_id + flags + b'\x00\x01' + qdcount + b'\x00\x00\x00\x00'
-    response += data[12:]
-    response += b'\x00\x01\x00\x01\x00\x00\x02\x58\x00\x04' + socket.inet_aton(response_ip)
-    
-    return response
 
-def main():
-    # Create a UDP socket and bind it to port 53
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(('0.0.0.0', 20200))
-    
-    while True:
-        # Receive a DNS request
-        data, addr = sock.recvfrom(1024)
-        
-        # Handle the DNS request and generate the response dynamically
-        response = handle_dns_request(data)
-        print("DND response:", response)
-        
-        # Send the DNS response back
-        sock.sendto(response, addr)
+class DNSServer:
+    """
+    A simple DNS server that listens on a UDP socket and responds to DNS queries.
+    """
 
-if __name__ == '__main__':
-    main()
+    def __init__(self, port: int, name: str) -> None:
+        """
+        Initialize the DNS server.
+
+        Args:
+            port: The port number on which to listen for DNS queries.
+            name: The name of the DNS server.
+        """
+
+        # create a UDP socket for DNS server
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.name = name
+        try:
+            # get the local IP address of the host
+            host = self.get_local_ip_address()
+
+            # bind the socket to the specified port and IP address
+            self.udp_socket.bind((host, port))
+        except socket.error:
+            print('Error connecting to socket')
+            sys.exit(1)
+
+
+    def recv(self) -> None:
+        """
+        Receive DNS queries on the UDP socket and send DNS responses.
+
+        This method listens on the UDP socket for incoming DNS queries, resolves the queries
+        to a pre-defined IP address, and sends DNS responses back to the clients.
+
+        Returns:
+            None.
+        """
+        while True:
+            # receive data from the UDP socket
+            data = self.udp_socket.recvfrom(1024)
+
+            # skip empty data
+            if not data:
+                continue
+
+            # get the source address of the incoming data
+            source = data[1]
+
+            # pre-defined IP address to resolve DNS queries
+            # Note: This is currently hard coded. Final submission will have find best ip address logic.
+            dns_resolved_ip = "192.168.0.159"
+
+            # the DNS query received from the client
+            dns_query = data[0]
+
+            # create a DNS response packet
+            response = self.create_dns_response(dns_query, dns_resolved_ip)
+
+            if response:
+                # send the DNS response back to the client
+                self.udp_socket.sendto(response, source)
+
+
+    def get_local_ip_address(self):
+        """
+        Get the private IP address of the current machine.
+
+        Returns:
+            A string representing the local IP address of the current machine.
+        """
+        # create a temporary socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            # connect to a well-known broadcast address and get the local IP
+            # address assigned to the socket
+            s.connect(('10.255.255.255', 1))
+            ip_address = s.getsockname()[0]
+        finally:
+            # finally close the socket before return
+            s.close()
+        return ip_address
+
+
+    def create_dns_response(self, dns_query: bytes, resolved_ip_address: str) -> Optional[bytes]:
+        """
+        Create a DNS response packet for a given DNS query packet.
+
+        """
+        # Unpack the DNS query headers
+        dns_query_headers = struct.unpack('!HHHHHH', dns_query[0:12])
+
+        # Get the number of questions in the DNS query packet
+        no_of_questions = dns_query_headers[2]
+
+        # Hardcode number of questions answered to 1
+        no_of_que_answered = 1
+
+        # Start parsing the DNS query packet after the headers 
+        # i.e 12th index in dns query packet
+        start = 12
+        domain_name, end, query_type, query_class = self.parse_question_packet(
+            dns_query[start:])
+
+        # Check if the DNS query matches the DNS server name
+        if (self.name != domain_name.decode()):
+            return None
+
+        # Create the answer packet
+        answers = self.create_answer_packet(
+            resolved_ip_address, dns_query[start:start+end], query_type, query_class)
+
+        # Create the response header and Return the DNS response packet
+        header = dns_query[0:2] + b"\x81\x80" + \
+            struct.pack('!HHHH', no_of_questions, no_of_que_answered, 0, 0)
+        return header + answers
+
+
+    def parse_question_packet(self, field: bytes) -> Tuple[bytes, int, int, int]:
+        """
+        Parse a DNS question packet and extract the domain name, query type, 
+        and query class.
+
+        Args:
+            field: The DNS question packet as a bytes object.
+
+        Returns:
+            A tuple containing the domain name, the length of the domain name, 
+            the query type, and the query class.
+        """
+        domain_name = b""  # initialize domain name
+        length_field = field[0]  # get the initial length field
+        start = 1  # start parsing after the length field
+        end = start + length_field  # calculate end position
+
+        # While there are still characters to read in the domain name
+        while (length_field != 0):
+            end = start + length_field  # calculate end position
+
+            # If this is the first part of the domain name
+            if not domain_name:
+                domain_name = field[start:end]
+            else:
+                domain_name = domain_name + b'.' + field[start:end]
+
+            start = end + 1  # move start position to the next length field
+            length_field = field[end]  # get the next length field
+
+        # Get the query type and query class fields
+        query_type = struct.unpack('!H', field[end+1:end+3])[0]
+        query_class = struct.unpack('!H', field[end+3:end+5])[0]
+
+        # Return the domain name, length of the domain name, query type, 
+        # and query class as a tuple
+        return domain_name, end + 5, query_type, query_class
+
+
+    def create_answer_packet(self, resolved_ip_address: str, query: bytes, 
+                             query_type: int, query_class: int):
+        """
+        Create a DNS answer packet with the resolved IP address.
+
+        Args:
+            ip_addr: The resolved IP address as a string.
+            query: The DNS question packet as a bytes object.
+            query_type: The query type as an integer.
+            query_class: The query class as an integer.
+
+        Returns:
+            The DNS answer packet as a bytes object.
+        """
+        ptr_field = b"\xc0\x0c"  # pointer to domain name field in question packet
+        ttl = 2  # time-to-live (TTL) field in answer packet
+        length = 4  # length of IP address field in answer packet
+        octets = resolved_ip_address.split('.')  # split IP address into octets
+
+        # Pack the answer packet fields using the specified format string
+        answer_packet = query + ptr_field + struct.pack(
+            '!HHLHBBBB', query_type, query_class, ttl, length,
+            int(octets[0]), int(octets[1]), int(octets[2]), int(octets[3])
+        )
+
+        # Return the answer packet as a bytes object
+        return answer_packet
+
+
+def main(port: int, name: str):
+    """
+    The entry point of the program.
+
+    Args:
+        port: The port number to listen on as an integer.
+        name: The DNS server name as a string.
+    """
+    dns_server = DNSServer(port, name)
+    # start listening for and responding to DNS queries
+    dns_server.recv()
+
+
+if __name__ == "__main__":
+
+    # Define the command line arguments
+    parser = argparse.ArgumentParser(description="DNS Server arguments")
+    parser.add_argument('-p', dest="port", action='store',
+                        type=int, help="Port Number")
+    parser.add_argument('-n', dest="name", action='store',
+                        type=str, help="CDN Domain Name")
+
+    # specify the port number and the origin server
+    port_number = 0
+
+    cdn_name = ''
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # if the cnd name and the port number are stated in the arguments,
+    # then we set them here, otherwise we set them to their default values.
+    if args.name and args.port:
+        port_number = args.port
+        cdn_name = args.name
+    else:
+        port_number = 20200  # port 20200 is bitbuster's specific port number
+        cdn_name = 'cs5700cdn.example.com'
+
+    # Call the main method with the specified port and cdn name
+    main(port_number, cdn_name)
