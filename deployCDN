@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+# Ex: ./deployCDN -p 20200 -o cs5700cdnorigin.ccs.neu.edu  -u bitbusters -n cs5700cdn.example.com -i ~/.ssh/id_rsa
+
+# Include command-line options from cdn_args.sh
+source $(dirname $0)/cdn_args.sh
+
+# Define a function to deploy files to a server
+# Usage: deploy script hostname
+function deploy {
+    script=$1
+    hostname=$2
+    echo "Deploying to $hostname ..."
+    scp -i $keyfile -r $(dirname $0)/* $username@$hostname:/home/$username
+    ssh -i $keyfile $username@$hostname make $script
+}
+
+# Deploy files to the DNS server
+deploy dnsserver 'cdn-dns.5700.network'
+
+# Deploy files to the HTTP servers from the replicas array
+for value in "${replicas[@]}"
+do
+  deploy httpserver $value
+done

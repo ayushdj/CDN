@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+# Ex: ./stopCDN -p 20200 -o cs5700cdnorigin.ccs.neu.edu  -u bitbusters -n cs5700cdn.example.com -i ~/.ssh/id_rsa
+
+# Include command-line options from cdn_args.sh
+source $(dirname $0)/cdn_args.sh
+
+# Define a function to Stopping http replica servers
+# Usage: stop_httpserver hostname
+function stop_httpserver {
+  hostname=$1
+  echo "Stopping http server on $hostname"
+  ssh -i $keyfile $username@$hostname "pkill -f \"python3 ./httpserver -p $port -o $origin\""
+}
+
+# Stop the DNS server
+dns_hostname='cdn-dns.5700.network'
+echo "Stopping DNS server on $dns_hostname"
+ssh -i $keyfile $username@$dns_hostname "pkill -f \"python3 ./dnsserver -p $port -n $name\""
+
+# Stop HTTP servers from the replicas array
+for value in "${replicas[@]}"
+do
+  stop_httpserver $value
+done
