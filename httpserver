@@ -46,6 +46,10 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
 
         current_directory = get_current_directory()
 
+        if self.path[1:] == 'grading/beacon':
+            self._send_information_over(204, "<html><body><h1>NO CONTENT.</h1></body></html>")
+            return
+
         # if the file we're looking for exists in the disk cache, then pull the data
         # from there, otherwise go to the Origin server and pull the data from there.
         if does_file_exist(f'{CACHE_DIRECTORY}/{self.path[1:]}'):
@@ -104,7 +108,6 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                     i = 0
                     while i < len(list_of_files) and \
                             int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
-                        print("removing ", list_of_files[i])
                         os.remove(list_of_files[i])
                         i += 1
 
@@ -118,8 +121,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                         file.close()
 
             except Exception as e:
-                # print("Unble to retrieve data from the origin server. Please request for the resource again")
-                self._send_information_over(400, "<html><body><h1>Unble to retrieve data from the origin server. "
+                self._send_information_over(404, "<html><body><h1>Unble to retrieve data from the origin server. "
                                                  "Please request for the resource again</h1></body></html>")
 
 
