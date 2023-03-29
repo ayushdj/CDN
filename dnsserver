@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import socket
 
 def handle_dns_request(data):
@@ -8,7 +10,7 @@ def handle_dns_request(data):
     qname = data[12:-4].decode('utf-8')
     
     # Generate the DNS response dynamically
-    response_ip = "192.168.1.1"
+    response_ip = "192.168.0.156"
     response = transaction_id + flags + b'\x00\x01' + qdcount + b'\x00\x00\x00\x00'
     response += data[12:]
     response += b'\x00\x01\x00\x01\x00\x00\x02\x58\x00\x04' + socket.inet_aton(response_ip)
@@ -18,7 +20,7 @@ def handle_dns_request(data):
 def main():
     # Create a UDP socket and bind it to port 53
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(('0.0.0.0', 5053))
+    sock.bind(('0.0.0.0', 20200))
     
     while True:
         # Receive a DNS request

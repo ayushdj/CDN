@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 CACHE_DIRECTORY = 'bitbusters_cache'
 
@@ -61,7 +62,7 @@ def mk_dir(directory: str) -> None:
         os.makedirs(directory)
 
 
-def check_file_in_directory(path_to_file: str, filename: str) -> str | None:
+def check_file_in_directory(path_to_file: str, filename: str) -> Optional[str]:
     """
     Helper function to see if a file exists in a directory. Includes any subdirectories. If the file exists, then
     we return both the path to the file, and true. otherwise, we return False.
