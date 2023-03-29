@@ -25,9 +25,7 @@ class DNSServer:
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.name = name
         try:
-            # get the local IP address of the host
-            host = self.get_local_ip_address()
-
+            host = '0.0.0.0'
             # bind the socket to the specified port and IP address
             self.udp_socket.bind((host, port))
         except socket.error:
@@ -69,26 +67,6 @@ class DNSServer:
             if response:
                 # send the DNS response back to the client
                 self.udp_socket.sendto(response, source)
-
-
-    def get_local_ip_address(self):
-        """
-        Get the private IP address of the current machine.
-
-        Returns:
-            A string representing the local IP address of the current machine.
-        """
-        # create a temporary socket
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            # connect to a well-known broadcast address and get the local IP
-            # address assigned to the socket
-            s.connect(('10.255.255.255', 1))
-            ip_address = s.getsockname()[0]
-        finally:
-            # finally close the socket before return
-            s.close()
-        return ip_address
 
 
     def create_dns_response(self, dns_query: bytes, resolved_ip_address: str) -> Optional[bytes]:
