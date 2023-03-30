@@ -86,7 +86,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
 
         except Exception as e:
             self._send_information_over(404, "<html><body><h1>Unble to retrieve data from the origin server. "
-                                             "Please request for the resource again</h1></body></html>")
+                                             "Please request for the resource again.</h1></body></html>")
             # ============================================================================================
             return
 
