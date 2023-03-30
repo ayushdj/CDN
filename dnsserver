@@ -29,6 +29,7 @@ class DNSServer:
         # create a UDP socket for DNS server
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.name = name
+        self.port = port
         try:
             host = '0.0.0.0'
             # bind the socket to the specified port and IP address
@@ -36,7 +37,6 @@ class DNSServer:
         except socket.error:
             print('Error connecting to socket')
             sys.exit(1)
-
 
     def recv(self) -> None:
         """
@@ -48,6 +48,7 @@ class DNSServer:
         Returns:
             None.
         """
+        print("Serving at port", self.port)
         while True:
             # receive data from the UDP socket
             data = self.udp_socket.recvfrom(1024)
@@ -73,7 +74,6 @@ class DNSServer:
                 # send the DNS response back to the client
                 self.udp_socket.sendto(response, source)
 
-
     def create_dns_response(self, dns_query: bytes, resolved_ip_address: str) -> Optional[bytes]:
         """
         Create a DNS response packet for a given DNS query packet.
@@ -88,7 +88,7 @@ class DNSServer:
         # Hardcode number of questions answered to 1
         no_of_que_answered = 1
 
-        # Start parsing the DNS query packet after the headers 
+        # Start parsing the DNS query packet after the headers
         # i.e 12th index in dns query packet
         start = 12
         domain_name, end, query_type, query_class = self.parse_question_packet(
@@ -106,7 +106,6 @@ class DNSServer:
         header = dns_query[0:2] + b"\x81\x80" + \
             struct.pack('!HHHH', no_of_questions, no_of_que_answered, 0, 0)
         return header + answers
-
 
     def parse_question_packet(self, field: bytes) -> Tuple[bytes, int, int, int]:
         """
@@ -142,12 +141,11 @@ class DNSServer:
         query_type = struct.unpack('!H', field[end+1:end+3])[0]
         query_class = struct.unpack('!H', field[end+3:end+5])[0]
 
-        # Return the domain name, length of the domain name, query type, 
+        # Return the domain name, length of the domain name, query type,
         # and query class as a tuple
         return domain_name, end + 5, query_type, query_class
 
-
-    def create_answer_packet(self, resolved_ip_address: str, query: bytes, 
+    def create_answer_packet(self, resolved_ip_address: str, query: bytes,
                              query_type: int, query_class: int):
         """
         Create a DNS answer packet with the resolved IP address.
@@ -191,29 +189,22 @@ def main(port: int, name: str):
 
 if __name__ == "__main__":
 
+
+    # specify the default port number and the cdn name
+    DEFAULT_PORT = 20200
+    DEFAULT_NAME = 'cs5700cdn.example.com'
+    
     # Define the command line arguments
     parser = argparse.ArgumentParser(description="DNS Server arguments")
+    
     parser.add_argument('-p', dest="port", action='store',
-                        type=int, help="Port Number")
-    parser.add_argument('-n', dest="name", action='store',
-                        type=str, help="CDN Domain Name")
-
-    # specify the port number and the origin server
-    port_number = 0
-
-    cdn_name = ''
+                        type=int, help="Port Number (default: %(default)s)", default=DEFAULT_PORT)
+    
+    parser.add_argument('-n', dest="name", action='store', type=str,
+                        help="CDN-specific name (default: %(default)s)", default=DEFAULT_NAME)
 
     # Parse the arguments
     args = parser.parse_args()
-
-    # if the cnd name and the port number are stated in the arguments,
-    # then we set them here, otherwise we set them to their default values.
-    if args.name and args.port:
-        port_number = args.port
-        cdn_name = args.name
-    else:
-        port_number = 20200  # port 20200 is bitbuster's specific port number
-        cdn_name = 'cs5700cdn.example.com'
-
+    
     # Call the main method with the specified port and cdn name
-    main(port_number, cdn_name)
+    main(args.port, args.name)
