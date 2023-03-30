@@ -8,10 +8,12 @@ import urllib.request
 from http_server_utils import *
 import os
 import csv
+from collections import OrderedDict
 
 MY_SERVER_NAME = 'cdn-http4.5700.network'
 ORIGIN_SERVER = 'cs5700cdnorigin.ccs.neu.edu:8080'
-DISK_SIZE_LIMIT = 20000000
+# DISK_SIZE_LIMIT = 20000000
+DISK_SIZE_LIMIT = 1000000
 
 
 class ReplicaHTTPServer(BaseHTTPRequestHandler):
@@ -19,6 +21,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
     This class inherits from the BaseHTTPRequestHandler in the 'http.server' library and outlines logic for
     a GET request on the replica HTTP server.
     """
+    cache = OrderedDict()
 
     def __init__(self, request: bytes, client_address: Tuple[str, int], server: socketserver.BaseServer):
         super().__init__(request, client_address, server)  # type: ignore
@@ -55,7 +58,8 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
 
         # if the file we're looking for exists in the disk cache, then pull the data
         # from there, otherwise go to the Origin server and pull the data from there.
-        if filepath and does_file_exist(f'{CACHE_DIRECTORY}/{filepath}'):
+        # if filepath and does_file_exist(f'{CACHE_DIRECTORY}/{filepath}'):
+        if f'{CACHE_DIRECTORY}/{filepath}' in self.cache:
             # open the file from the cache
             with open(f'{current_directory}/{CACHE_DIRECTORY}/{filepath}', 'r') as file:
                 file_lines = file.readlines()
@@ -63,6 +67,10 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
             # join the string list and send the data back out.
             joined_result = "".join(file_lines)
             self._send_information_over(200, joined_result)
+
+            size = self.cache.pop(f'{CACHE_DIRECTORY}/{filepath}')
+            self.cache[f'{CACHE_DIRECTORY}/{filepath}'] = size
+            print(self.cache)
             return
 
         try:
@@ -77,7 +85,6 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                 self._send_information_over(response.status, data.decode())
 
         except Exception as e:
-            # print("Unble to retrieve data from the origin server. Please request for the resource again")
             self._send_information_over(404, "<html><body><h1>Unble to retrieve data from the origin server. "
                                              "Please request for the resource again</h1></body></html>")
             # ============================================================================================
@@ -90,47 +97,22 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
         # we need to cache the data that we just found from the origin server, but if the size of the
         # current directory plus the new file size is greater than the disk size limit, we need to remove
         # certain files based on priority.
-        if int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
-            with open('pageviews.csv', newline='') as csvfile:
-                CSV_READER = csv.DictReader(csvfile)
-                CSV_READER = list(CSV_READER)
+        while len(self.cache) > 0 and int(sum(self.cache.values())) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
+            (file_to_remove_path, size) = self.cache.popitem(last=False)
+            print(file_to_remove_path)
+            os.remove(file_to_remove_path)
 
-                # loop over all the rows in the csv, but in reversed order because we want to remove the
-                # lowest priority files first.
-                for row in reversed(CSV_READER):
-                    # the csv doesn't have underscores in it, so we need to modify each file name.
-                    row['article'] = row['article'].replace(' ', '_')
+        self.cache[f'{CACHE_DIRECTORY}/{filepath}'] = int(headers['Content-Length'])
 
-                    # find the path for the following file and if it actually exists in our cache, we remove
-                    # the file from our cache.
-                    directory = check_file_in_directory(CACHE_DIRECTORY, row['article'])
-                    if directory is not None:
-                        os.remove(f'{current_directory}/{directory}')
+        # extract the directory path and the name of the file and make the directory.
+        dir_path, file_name = os.path.split(filepath)
+        mk_dir(f'{CACHE_DIRECTORY}/{dir_path}')
 
-                    if int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
-                        continue
-                    else:
-                        break
-
-            # even after removing all the least priority files, we still want to make sure that we have the
-            # space to add our new file. We do this by removing the files that have been in the cache the
-            # longest
-            list_of_files = remove_old_files()
-            i = 0
-            while i < len(list_of_files) and \
-                    int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
-                print("removing ", list_of_files[i])
-                os.remove(list_of_files[i])
-                i += 1
-
-            # extract the directory path and the name of the file and make the directory.
-            dir_path, file_name = os.path.split(filepath)
-            mk_dir(f'{CACHE_DIRECTORY}/{dir_path}')
-
-            with open(f'{CACHE_DIRECTORY}/{filepath}', "wb") as file:
-                # Write the content of the file to the file we're creating and close the file out.
-                file.write(data)
-                file.close()
+        with open(f'{CACHE_DIRECTORY}/{filepath}', "wb") as file:
+            # Write the content of the file to the file we're creating and close the file out.
+            file.write(data)
+            file.close()
+        print(self.cache)
 
 
 def main(server_port_number):

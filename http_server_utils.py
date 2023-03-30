@@ -20,7 +20,8 @@ def size_of_cache_directory():
     """
     Helper function to determine the size of the cache directory. This is needed
 
-    :return: an integer re
+    Returns:
+         An integer representing the size of the directory
     """
     return sum(
         os.path.getsize(os.path.join(dirpath, filename))
@@ -34,7 +35,7 @@ def get_current_directory() -> str:
     Helper function to determine the current working directory in the system
 
     Return:
-            a string representing the current working directory
+            A string representing the current working directory
     """
     return os.getcwd()
 
@@ -72,7 +73,7 @@ def check_file_in_directory(path_to_file: str, filename: str) -> Optional[str]:
         filename: the name of the file we're looking for
 
     Returns:
-        a string representing the path of the file if the file we're looking for exists, None otherwise
+        A string representing the path of the file if the file we're looking for exists, None otherwise
     """
     for dirpath, dirnames, filenames in os.walk(path_to_file):
         for file in filenames:
@@ -95,7 +96,7 @@ def remove_old_files():
             file_path = os.path.join(root, file)
             file_list.append(file_path)
 
-    # Sort the list of files based on their creation time, oldest first
+    # Sort the list of files based on their creation time, the oldest first
     file_list.sort(key=lambda x: os.path.getctime(x))
 
     return file_list
