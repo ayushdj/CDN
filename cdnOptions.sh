@@ -29,8 +29,8 @@ while [[ $# -gt 0 ]]; do
     --help)
       # Print usage message and option descriptions
       echo $usage
-      echo "-p value: DNS and HTTP replica servers"
-      echo "-o value: Origin server hostname"
+      echo "-p value: Port number for DNS and HTTP replica servers"
+      echo "-o value: Origin server"
       echo "-n value: CDN-specific name that translates to an IP"
       echo "-u value: ssh username"
       echo "-i value: ssh private key"
