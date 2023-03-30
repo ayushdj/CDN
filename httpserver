@@ -52,7 +52,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
 
         # send 204 if the path has "/grading/beacon"
         if filepath == 'grading/beacon':
-            self._send_information_over(204, "<html><body><h1>NO CONTENT.</h1></body></html>")
+            self._send_information_over(204, '<html><body><h1>NO CONTENT.</h1></body></html>')
             return
 
         # if the file we're looking for exists in the disk cache, then pull the data
@@ -85,8 +85,8 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                 self._send_information_over(response.status, data.decode())
 
         except Exception as e:
-            self._send_information_over(404, "<html><body><h1>Unble to retrieve data from the origin server. "
-                                             "Please request for the resource again.</h1></body></html>")
+            self._send_information_over(404, '<html><body><h1>Unble to retrieve data from the origin server. '
+                                             'Please request for the resource again.</h1></body></html>')
             # ============================================================================================
             return
 
@@ -112,49 +112,47 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
         mk_dir(f'{CACHE_DIRECTORY}/{dir_path}')
 
         # write the file to the cache.
-        with open(f'{CACHE_DIRECTORY}/{filepath}', "wb") as file:
+        with open(f'{CACHE_DIRECTORY}/{filepath}', 'wb') as file:
             # Write the content of the file to the file we're creating and close the file out.
             file.write(data)
             file.close()
 
 
-def main(server_port_number):
+def main(server_port_number: int):
     """
     The entry point into the http server.
     Args:
         server_port_number: the port number this http server is listening/sending on
-
     """
     # create the cache directory if it doesn't exist, because this is where we
     # store all the cached data.
     mk_dir(CACHE_DIRECTORY)
 
-    with socketserver.TCPServer(("0.0.0.0", server_port_number), ReplicaHTTPServer) as httpd:
-        print("serving at port", server_port_number)
+    with socketserver.TCPServer(('0.0.0.0', server_port_number), ReplicaHTTPServer) as httpd:
+        print('Serving at port', server_port_number)
         httpd.serve_forever()
 
 
 if __name__ == "__main__":
-    # Define the command line arguments
-    parser = argparse.ArgumentParser(description="Determine HTTP Server arguments")
-    parser.add_argument('-p', dest="port", action='store', type=int, help="Port Number")
-    parser.add_argument('-o', dest="origin", action='store', type=str, help="The origin server")
 
     # specify the port number and the origin server
-    port_number = 0
 
-    origin_server = ''
+    default_port = 20200
+    default_origin_server = 'cs5700cdnorigin.ccs.neu.edu:8080'
+
+    # Define the command line arguments
+    parser = argparse.ArgumentParser(
+        description='Determine HTTP Server arguments')
+    parser.add_argument('-p', dest='port', action='store', type=int,
+                        help='Port Number (default: %(default)s)', default=default_port)
+    parser.add_argument('-o', dest='origin', action='store', type=str,
+                        help='The Origin Server (default: %(default)s)', default=default_origin_server)
+
     # Parse the arguments
     args = parser.parse_args()
 
-    # if the origin server and the port number are stated in the arguments, then we set them here,
-    # otherwise we revert them to their defaults.
-    if args.origin and args.port:
-        port_number = args.port
-        ORIGIN_SERVER = args.origin
-    else:
-        port_number = 20200  # port 20200 is bitbuster's specific port number
-        ORIGIN_SERVER = 'cs5700cdnorigin.ccs.neu.edu:8080'
+    # Set value for origin server
+    ORIGIN_SERVER = args.origin
 
     # Call the main method with the specified port and origin
-    main(port_number)
+    main(args.port)
