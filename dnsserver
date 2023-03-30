@@ -95,7 +95,7 @@ class DNSServer:
             dns_query[start:])
 
         # Check if the DNS query matches the DNS server name
-        if (self.name != domain_name.decode()):
+        if self.name != domain_name.decode():
             return None
 
         # Create the answer packet
@@ -125,7 +125,7 @@ class DNSServer:
         end = start + length_field  # calculate end position
 
         # While there are still characters to read in the domain name
-        while (length_field != 0):
+        while length_field != 0:
             end = start + length_field  # calculate end position
 
             # If this is the first part of the domain name
@@ -158,6 +158,7 @@ class DNSServer:
 
         Returns:
             The DNS answer packet as a bytes object.
+            :param resolved_ip_address:
         """
         ptr_field = b"\xc0\x0c"  # pointer to domain name field in question packet
         ttl = 2  # time-to-live (TTL) field in answer packet
