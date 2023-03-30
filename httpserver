@@ -5,12 +5,10 @@ from http.server import BaseHTTPRequestHandler
 import socketserver
 from typing import Tuple
 import urllib.request
-from http_server_utils import *
+from utils import *
 import os
 import csv
 
-MY_SERVER_NAME = 'cdn-http4.5700.network'
-ORIGIN_SERVER = 'cs5700cdnorigin.ccs.neu.edu:8080'
 DISK_SIZE_LIMIT = 20000000
 
 
@@ -21,7 +19,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
     """
 
     def __init__(self, request: bytes, client_address: Tuple[str, int], server: socketserver.BaseServer):
-        super().__init__(request, client_address, server) # type: ignore
+        super().__init__(request, client_address, server)  # type: ignore
 
     def _send_information_over(self, response_code, html_string):
         """
@@ -45,7 +43,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
         """
 
         current_directory = get_current_directory()
-        
+
         filepath = self.path[1:]
 
         # if the file we're looking for exists in the disk cache, then pull the data
@@ -59,7 +57,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
             joined_result = "".join(file_lines)
             self._send_information_over(200, joined_result)
             return
-        
+
         try:
             # actual path to the resource on the Origin server
             actual_resource_path = f'http://{ORIGIN_SERVER}/{filepath}'
@@ -74,14 +72,14 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
         except Exception as e:
             # print("Unble to retrieve data from the origin server. Please request for the resource again")
             self._send_information_over(400, "<html><body><h1>Unble to retrieve data from the origin server. "
-                                                "Please request for the resource again</h1></body></html>")
-                # ============================================================================================
+                                        "Please request for the resource again</h1></body></html>")
+            # ============================================================================================
             return
 
         # exit if filepath is empty i.e root / path.
         if not filepath:
             return
-        
+
         # we need to cache the data that we just found from the origin server, but if the size of the
         # current directory plus the new file size is greater than the disk size limit, we need to remove
         # certain files based on priority.
@@ -98,7 +96,8 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
 
                     # find the path for the following file and if it actually exists in our cache, we remove
                     # the file from our cache.
-                    directory = check_file_in_directory(CACHE_DIRECTORY, row['article'])
+                    directory = check_file_in_directory(
+                        CACHE_DIRECTORY, row['article'])
                     if directory is not None:
                         os.remove(f'{current_directory}/{directory}')
 
@@ -128,7 +127,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                 file.close()
 
 
-def main(server_port_number):
+def main(server_port_number: int):
     """
     The entry point into the http server.
     Args:
@@ -139,32 +138,31 @@ def main(server_port_number):
     # store all the cached data.
     mk_dir(CACHE_DIRECTORY)
 
-    with socketserver.TCPServer(("127.0.0.1", server_port_number), ReplicaHTTPServer) as httpd:
-        print("serving at port", server_port_number)
+    with socketserver.TCPServer(("0.0.0.0", server_port_number), ReplicaHTTPServer) as httpd:
+        print("Serving at port", server_port_number)
         httpd.serve_forever()
 
 
 if __name__ == "__main__":
-    # Define the command line arguments
-    parser = argparse.ArgumentParser(description="Determine HTTP Server arguments")
-    parser.add_argument('-p', dest="port", action='store', type=int, help="Port Number")
-    parser.add_argument('-o', dest="origin", action='store', type=str, help="The origin server")
 
     # specify the port number and the origin server
-    port_number = 0
 
-    origin_server = ''
+    DEFAULT_PORT = 20200
+    DEFAULT_ORIGIN_SERVER = 'cs5700cdnorigin.ccs.neu.edu:8080'
+
+    # Define the command line arguments
+    parser = argparse.ArgumentParser(
+        description="Determine HTTP Server arguments")
+    parser.add_argument('-p', dest="port", action='store', type=int,
+                        help="Port Number (default: %(default)s)", default=DEFAULT_PORT)
+    parser.add_argument('-o', dest="origin", action='store', type=str,
+                        help="The Origin Server (default: %(default)s)", default=DEFAULT_ORIGIN_SERVER)
+
     # Parse the arguments
     args = parser.parse_args()
 
-    # if the origin server and the port number are stated in the arguments, then we set them here,
-    # otherwise we revert them to their defaults.
-    if args.origin and args.port:
-        port_number = args.port
-        ORIGIN_SERVER = args.origin
-    else:
-        port_number = 20200  # port 20200 is bitbuster's specific port number
-        ORIGIN_SERVER = 'cs5700cdnorigin.ccs.neu.edu:8080'
+    # Set value for origin server
+    ORIGIN_SERVER = args.origin
 
     # Call the main method with the specified port and origin
-    main(port_number)
+    main(args.port)

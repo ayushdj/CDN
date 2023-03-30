@@ -2,8 +2,8 @@
 
 # Ex: ./stopCDN -p 20200 -o cs5700cdnorigin.ccs.neu.edu:8080  -u bitbusters -n cs5700cdn.example.com -i ~/.ssh/id_rsa
 
-# Include command-line options from cdn_args.sh
-source $(dirname $0)/cdn_args.sh
+# Include command-line options from cdnOptions.sh
+source $(dirname $0)/cdnOptions.sh
 
 # Helper function to stop http replica servers
 # Usage: stop_httpserver hostname
