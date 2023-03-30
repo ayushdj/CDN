@@ -2,21 +2,21 @@
 
 # Ex: ./runCDN -p 20200 -o cs5700cdnorigin.ccs.neu.edu:8080  -u bitbusters -n cs5700cdn.example.com -i ~/.ssh/id_rsa
 
-# Include command-line options from cdn_args.sh
-source $(dirname $0)/cdn_args.sh
+# Include command-line options from cdnOptions.sh
+source $(dirname $0)/cdnOptions.sh
 
 # Helper function to run http replica servers
 # Usage: run_httpserver hostname
 function run_httpserver {
   hostname=$1
   echo "Running http server on $hostname"
-  ssh -i $keyfile $username@$hostname ./httpserver -p $port -o $origin &
+  ssh -i $keyfile $username@$hostname "./httpserver -p $port -o $origin > /dev/null 2> /home/$username/error.log &"
 }
 
 # Start the DNS server
 dns_hostname='cdn-dns.5700.network'
 echo "Running DNS server on $dns_hostname"
-ssh -i $keyfile $username@$dns_hostname ./dnsserver -p $port -n $name &
+ssh -i $keyfile $username@$dns_hostname "./dnsserver -p $port -n $name > /dev/null 2> /home/$username/error.log &"
 
 # Start HTTP servers from the replicas array
 for value in "${replicas[@]}"

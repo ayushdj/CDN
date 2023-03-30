@@ -2,8 +2,8 @@
 
 # Ex: ./deployCDN -p 20200 -o cs5700cdnorigin.ccs.neu.edu:8080  -u bitbusters -n cs5700cdn.example.com -i ~/.ssh/id_rsa
 
-# Include command-line options from cdn_args.sh
-source $(dirname $0)/cdn_args.sh
+# Include command-line options from cdnOptions.sh
+source $(dirname $0)/cdnOptions.sh
 
 # Helper function to deploy files to the given server server
 # Usage: deploy script hostname
@@ -12,7 +12,7 @@ function deploy {
     hostname=$2
     echo "Deploying to $hostname ..."
     scp -i $keyfile -r $(dirname $0)/* $username@$hostname:/home/$username
-    ssh -i $keyfile $username@$hostname make $script
+    ssh -i $keyfile $username@$hostname "make $script && rm -rf /home/$username/error.log"
 }
 
 # Deploy files to the DNS server
