@@ -7,6 +7,7 @@ Testing: dig @127.0.0.1 -p 20200 cs5700cdn.example.com
 
 import socket
 import argparse
+import asyncio
 import sys
 import struct
 from typing import Optional, Tuple
@@ -34,8 +35,8 @@ class DNSServer:
             host = '0.0.0.0'
             # bind the socket to the specified port and IP address
             self.udp_socket.bind((host, port))
-        except socket.error:
-            print('Error connecting to socket')
+        except socket.error as error:
+            print('Error connecting to socket: ', error)
             sys.exit(1)
 
     def recv(self) -> None:
@@ -49,14 +50,14 @@ class DNSServer:
             None.
         """
         print("Serving at port", self.port)
-        while True:
-            # receive data from the UDP socket
-            data = self.udp_socket.recvfrom(1024)
+        
+        async def dns_coroutine(data: Tuple[bytes, str]) -> None:
+            """
+            Asynchronous coroutine closure function that performs a DNS lookup operation.
 
-            # skip empty data
-            if not data:
-                continue
-
+            Args:
+                data: Data tuple received from DNS UDP socket
+            """
             # get the source address of the incoming data
             source = data[1]
 
@@ -73,6 +74,14 @@ class DNSServer:
             if response:
                 # send the DNS response back to the client
                 self.udp_socket.sendto(response, source)
+    
+        while True:
+            # receive data from the UDP socket
+            data = self.udp_socket.recvfrom(1024)
+            # skip empty data
+            if not data:
+                continue
+            asyncio.run(dns_coroutine(data))
 
     def create_dns_response(self, dns_query: bytes, resolved_ip_address: str) -> Optional[bytes]:
         """

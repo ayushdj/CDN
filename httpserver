@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+'''
+Start: ./httpserver -p 20200 -o 'cs5700cdnorigin.ccs.neu.edu:8080'
+Testing: wget http://localhost:20200/
+'''
+
 import argparse
 from http.server import BaseHTTPRequestHandler
 import socketserver
