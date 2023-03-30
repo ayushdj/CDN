@@ -31,7 +31,7 @@ dig @cdn-dns.5700.network -p 20200 -t A cs5700cdn.example.com
 - We also tested DNS server using dig with multiple input CDN name.
 
 #### End-to-End
-An essential part of this project is end-to-end testing. We feel confident in the ability of our DNS and HTTP servers to work together as a result. End-to-end testing was carried out in isolation using steps.
+An essential part of this project is end-to-end testing. We feel confident in the ability of our DNS and HTTP servers to work together as a result. End-to-end testing was carried out in isolation using following steps.
 
 - Create a Ubuntu VM to test in isolation.
 - Add `nameserver 198.74.61.103` to `/etc/resolv.conf`. Don't remove default nameserver as it will act as fallback. Note: `198.74.61.103` is ip address of dns server `cdn-dns.5700.network`
