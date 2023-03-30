@@ -7,8 +7,11 @@ from typing import Tuple
 import urllib.request
 from utils import *
 import os
-import csv
+# import csv
+from collections import OrderedDict
 
+MY_SERVER_NAME = 'cdn-http4.5700.network'
+ORIGIN_SERVER = 'cs5700cdnorigin.ccs.neu.edu:8080'
 DISK_SIZE_LIMIT = 20000000
 
 
@@ -17,6 +20,7 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
     This class inherits from the BaseHTTPRequestHandler in the 'http.server' library and outlines logic for
     a GET request on the replica HTTP server.
     """
+    cache = OrderedDict()
 
     def __init__(self, request: bytes, client_address: Tuple[str, int], server: socketserver.BaseServer):
         super().__init__(request, client_address, server)  # type: ignore
@@ -46,9 +50,14 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
 
         filepath = self.path[1:]
 
+        # send 204 if the path has "/grading/beacon"
+        if filepath == 'grading/beacon':
+            self._send_information_over(204, '<html><body><h1>NO CONTENT.</h1></body></html>')
+            return
+
         # if the file we're looking for exists in the disk cache, then pull the data
         # from there, otherwise go to the Origin server and pull the data from there.
-        if filepath and does_file_exist(f'{CACHE_DIRECTORY}/{filepath}'):
+        if f'{CACHE_DIRECTORY}/{filepath}' in self.cache:
             # open the file from the cache
             with open(f'{current_directory}/{CACHE_DIRECTORY}/{filepath}', 'r') as file:
                 file_lines = file.readlines()
@@ -56,6 +65,10 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
             # join the string list and send the data back out.
             joined_result = "".join(file_lines)
             self._send_information_over(200, joined_result)
+
+            # add the data to the cache
+            size = self.cache.pop(f'{CACHE_DIRECTORY}/{filepath}')
+            self.cache[f'{CACHE_DIRECTORY}/{filepath}'] = size
             return
 
         try:
@@ -67,64 +80,42 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                 # Extract the data from te origin server and the headers.
                 data = response.read()
                 headers = response.info()
+
+                # send the data over
                 self._send_information_over(response.status, data.decode())
 
         except Exception as e:
-            # print("Unble to retrieve data from the origin server. Please request for the resource again")
-            self._send_information_over(400, "<html><body><h1>Unble to retrieve data from the origin server. "
-                                        "Please request for the resource again</h1></body></html>")
+            self._send_information_over(404, '<html><body><h1>Unble to retrieve data from the origin server. '
+                                             'Please request for the resource again.</h1></body></html>')
             # ============================================================================================
             return
 
-        # exit if filepath is empty i.e root / path.
+        # exit if filepath is empty i.e, root / path.
         if not filepath:
             return
 
         # we need to cache the data that we just found from the origin server, but if the size of the
-        # current directory plus the new file size is greater than the disk size limit, we need to remove
-        # certain files based on priority.
-        if int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
-            with open('pageviews.csv', newline='') as csvfile:
-                CSV_READER = csv.DictReader(csvfile)
-                CSV_READER = list(CSV_READER)
+        # cache plus the new file size is greater than the disk size limit, we need to start removing items from the
+        # head of the cache.
+        while len(self.cache) > 0 and int(sum(self.cache.values())) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
+            # extract the least recently used file
+            (file_to_remove_path, size) = self.cache.popitem(last=False)
 
-                # loop over all the rows in the csv, but in reversed order because we want to remove the
-                # lowest priority files first.
-                for row in reversed(CSV_READER):
-                    # the csv doesn't have underscores in it, so we need to modify each file name.
-                    row['article'] = row['article'].replace(' ', '_')
+            # delete that file
+            delete_file(file_to_remove_path)
 
-                    # find the path for the following file and if it actually exists in our cache, we remove
-                    # the file from our cache.
-                    directory = check_file_in_directory(
-                        CACHE_DIRECTORY, row['article'])
-                    if directory is not None:
-                        os.remove(f'{current_directory}/{directory}')
+        # add the file to the cache.
+        self.cache[f'{CACHE_DIRECTORY}/{filepath}'] = int(headers['Content-Length'])
 
-                    if int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
-                        continue
-                    else:
-                        break
+        # extract the directory path and the name of the file and make the directory.
+        dir_path, file_name = os.path.split(filepath)
+        mk_dir(f'{CACHE_DIRECTORY}/{dir_path}')
 
-            # even after removing all the least priority files, we still want to make sure that we have the
-            # space to add our new file. We do this by removing the files that have been in the cache the
-            # longest
-            list_of_files = remove_old_files()
-            i = 0
-            while i < len(list_of_files) and \
-                    int(size_of_cache_directory()) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
-                print("removing ", list_of_files[i])
-                os.remove(list_of_files[i])
-                i += 1
-
-            # extract the directory path and the name of the file and make the directory.
-            dir_path, file_name = os.path.split(filepath)
-            mk_dir(f'{CACHE_DIRECTORY}/{dir_path}')
-
-            with open(f'{CACHE_DIRECTORY}/{filepath}', "wb") as file:
-                # Write the content of the file to the file we're creating and close the file out.
-                file.write(data)
-                file.close()
+        # write the file to the cache.
+        with open(f'{CACHE_DIRECTORY}/{filepath}', 'wb') as file:
+            # Write the content of the file to the file we're creating and close the file out.
+            file.write(data)
+            file.close()
 
 
 def main(server_port_number: int):
@@ -132,14 +123,13 @@ def main(server_port_number: int):
     The entry point into the http server.
     Args:
         server_port_number: the port number this http server is listening/sending on
-
     """
     # create the cache directory if it doesn't exist, because this is where we
     # store all the cached data.
     mk_dir(CACHE_DIRECTORY)
 
-    with socketserver.TCPServer(("0.0.0.0", server_port_number), ReplicaHTTPServer) as httpd:
-        print("Serving at port", server_port_number)
+    with socketserver.TCPServer(('0.0.0.0', server_port_number), ReplicaHTTPServer) as httpd:
+        print('Serving at port', server_port_number)
         httpd.serve_forever()
 
 
@@ -147,16 +137,16 @@ if __name__ == "__main__":
 
     # specify the port number and the origin server
 
-    DEFAULT_PORT = 20200
-    DEFAULT_ORIGIN_SERVER = 'cs5700cdnorigin.ccs.neu.edu:8080'
+    default_port = 20200
+    default_origin_server = 'cs5700cdnorigin.ccs.neu.edu:8080'
 
     # Define the command line arguments
     parser = argparse.ArgumentParser(
-        description="Determine HTTP Server arguments")
-    parser.add_argument('-p', dest="port", action='store', type=int,
-                        help="Port Number (default: %(default)s)", default=DEFAULT_PORT)
-    parser.add_argument('-o', dest="origin", action='store', type=str,
-                        help="The Origin Server (default: %(default)s)", default=DEFAULT_ORIGIN_SERVER)
+        description='Determine HTTP Server arguments')
+    parser.add_argument('-p', dest='port', action='store', type=int,
+                        help='Port Number (default: %(default)s)', default=default_port)
+    parser.add_argument('-o', dest='origin', action='store', type=str,
+                        help='The Origin Server (default: %(default)s)', default=default_origin_server)
 
     # Parse the arguments
     args = parser.parse_args()
