@@ -16,18 +16,18 @@ CACHE_DIRECTORY = 'bitbusters_cache'
 #     return False
 
 
-# def size_of_cache_directory():
-#     """
-#     Helper function to determine the size of the cache directory. This is needed
-#
-#     Returns:
-#          An integer representing the size of the directory
-#     """
-#     return sum(
-#         os.path.getsize(os.path.join(dirpath, filename))
-#         for dirpath, _, filenames in os.walk(CACHE_DIRECTORY)
-#         for filename in filenames
-#     )
+def size_of_cache_directory():
+    """
+    Helper function to determine the size of the cache directory. This is needed
+
+    Returns:
+         An integer representing the size of the directory
+    """
+    return sum(
+        os.path.getsize(os.path.join(dirpath, filename))
+        for dirpath, _, filenames in os.walk(CACHE_DIRECTORY)
+        for filename in filenames
+    )
 
 
 def get_current_directory() -> str:
@@ -81,22 +81,23 @@ def mk_dir(directory: str) -> None:
 #                 return os.path.join(dirpath, filename)
 #     return None
 
+def find_recently_modified_files():
+    """
+    Gets all the files from a directory and sorts them in descending order (oldest file to youngest file),
+    along with their size in bytes.
 
-# def remove_old_files():
-#     """
-#     Gets all the files from a directory and sorts them in descending order (oldest file to youngest file).
-#
-#     Returns:
-#         List of all the file names sorted by the date they were created in the cache
-#     """
-#     # Create a list of all files in the directory and its subdirectories
-#     file_list = []
-#     for root, dirs, files in os.walk(CACHE_DIRECTORY):
-#         for file in files:
-#             file_path = os.path.join(root, file)
-#             file_list.append(file_path)
-#
-#     # Sort the list of files based on their creation time, the oldest first
-#     file_list.sort(key=lambda x: os.path.getctime(x))
-#
-#     return file_list
+    Returns:
+        List of tuples, where each tuple contains the file path and size (in bytes) sorted by the date they were modified
+    """
+    # Create a list of all files in the directory and its subdirectories, along with their size
+    file_list = []
+    for root, dirs, files in os.walk(CACHE_DIRECTORY):
+        for file in files:
+            file_path = os.path.join(root, file)
+            file_size = os.path.getsize(file_path)
+            file_list.append((file_path, file_size))
+
+    # Sort the list of files based on their modification time, with the most recently modified file last
+    file_list.sort(key=lambda x: os.path.getmtime(x[0]), reverse=False)
+
+    return file_list
