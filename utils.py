@@ -1,19 +1,6 @@
 import os
-# from typing import Optional
 
 CACHE_DIRECTORY = 'bitbusters_cache'
-
-
-# def does_file_exist(path_to_file: str) -> int:
-#     """
-#     Helper function to determine if a file exists in the system
-#
-#     Args:
-#         path_to_file: the name of the file we want to see exist
-#     """
-#     if os.path.isfile(path_to_file):
-#         return True
-#     return False
 
 
 def size_of_cache_directory():
@@ -62,24 +49,6 @@ def mk_dir(directory: str) -> None:
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-
-# def check_file_in_directory(path_to_file: str, filename: str) -> Optional[str]:
-#     """
-#     Helper function to see if a file exists in a directory. Includes any subdirectories. If the file exists, then
-#     we return both the path to the file, and true. otherwise, we return False.
-#
-#     Args:
-#         path_to_file: the directory the file we're looking for lives in
-#         filename: the name of the file we're looking for
-#
-#     Returns:
-#         A string representing the path of the file if the file we're looking for exists, None otherwise
-#     """
-#     for dirpath, dirnames, filenames in os.walk(path_to_file):
-#         for file in filenames:
-#             if file == filename:
-#                 return os.path.join(dirpath, filename)
-#     return None
 
 def find_recently_modified_files():
     """
