@@ -50,7 +50,7 @@ class DNSServer:
             None.
         """
         print("Serving at port", self.port)
-        
+
         async def dns_coroutine(data: Tuple[bytes, str]) -> None:
             """
             Asynchronous coroutine closure function that performs a DNS lookup operation.
@@ -72,9 +72,9 @@ class DNSServer:
             response = self.create_dns_response(dns_query, dns_resolved_ip)
 
             if response:
-                # send the DNS response back to the client
+                # send the DNS response back to the client if
                 self.udp_socket.sendto(response, source)
-    
+
         while True:
             # receive data from the UDP socket
             data = self.udp_socket.recvfrom(1024)
@@ -105,7 +105,8 @@ class DNSServer:
 
         # Check if the DNS query matches the DNS server name
         if self.name != domain_name.decode():
-            return None
+            # send refused response for all other DNS queries.
+            return self.create_refused_response(dns_query)
 
         # Create the answer packet
         answers = self.create_answer_packet(
@@ -115,6 +116,24 @@ class DNSServer:
         header = dns_query[0:2] + b"\x81\x80" + \
             struct.pack('!HHHH', no_of_questions, no_of_que_answered, 0, 0)
         return header + answers
+
+    def create_refused_response(self, dns_query: bytes) -> bytes:
+        """Create a DNS response message with REFUSED response code.
+
+        Args:
+            dns_query: The original DNS query message.
+
+        Returns:
+            bytes: A DNS response message with REFUSED response code.
+        """
+        # Extract the transaction ID from the query
+        transaction_id = struct.unpack('!H', dns_query[0:2])[0]
+
+        # Create the response message with REFUSED response code
+        response_message = struct.pack(
+            '!HHHHHH', transaction_id, 0x8183, 0x0001, 0x0000, 0x0000, 0x0000)
+
+        return response_message
 
     def parse_question_packet(self, field: bytes) -> Tuple[bytes, int, int, int]:
         """
@@ -199,22 +218,21 @@ def main(port: int, name: str):
 
 if __name__ == "__main__":
 
-
     # specify the default port number and the cdn name
     DEFAULT_PORT = 20200
     DEFAULT_NAME = 'cs5700cdn.example.com'
-    
+
     # Define the command line arguments
     parser = argparse.ArgumentParser(description="DNS Server arguments")
-    
+
     parser.add_argument('-p', dest="port", action='store',
                         type=int, help="Port Number (default: %(default)s)", default=DEFAULT_PORT)
-    
+
     parser.add_argument('-n', dest="name", action='store', type=str,
                         help="CDN-specific name (default: %(default)s)", default=DEFAULT_NAME)
 
     # Parse the arguments
     args = parser.parse_args()
-    
+
     # Call the main method with the specified port and cdn name
     main(args.port, args.name)

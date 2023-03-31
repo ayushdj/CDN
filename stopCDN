@@ -9,14 +9,14 @@ source $(dirname $0)/cdnOptions.sh
 # Usage: stop_httpserver hostname
 function stop_httpserver {
   hostname=$1
-  echo "Stopping http server on $hostname"
-  ssh -i $keyfile $username@$hostname "pkill -f \"python3 ./httpserver -p $port -o $origin\""
+  echo "Stopping HTTP server on $hostname"
+  ssh -oBatchMode=yes -i $keyfile $username@$hostname "pkill -f \"python3 ./httpserver -p $port -o $origin\""
 }
 
 # Stop the DNS server
 dns_hostname='cdn-dns.5700.network'
 echo "Stopping DNS server on $dns_hostname"
-ssh -i $keyfile $username@$dns_hostname "pkill -f \"python3 ./dnsserver -p $port -n $name\""
+ssh -oBatchMode=yes -i $keyfile $username@$dns_hostname "pkill -f \"python3 ./dnsserver -p $port -n $name\""
 
 # Stop HTTP servers from the replicas array
 for value in "${replicas[@]}"

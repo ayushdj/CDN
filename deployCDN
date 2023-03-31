@@ -11,8 +11,8 @@ function deploy {
     script=$1
     hostname=$2
     echo "Deploying to $hostname ..."
-    scp -i $keyfile -r $(dirname $0)/* $username@$hostname:/home/$username
-    ssh -i $keyfile $username@$hostname "make $script && rm -rf /home/$username/error.log"
+    scp -oBatchMode=yes -i $keyfile -r $(dirname $0)/* $username@$hostname:/home/$username
+    ssh -oBatchMode=yes -i $keyfile $username@$hostname "make $script && rm -rf /home/$username/error.log"
 }
 
 # Deploy files to the DNS server
