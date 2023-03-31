@@ -72,7 +72,7 @@ class DNSServer:
             response = self.create_dns_response(dns_query, dns_resolved_ip)
 
             if response:
-                # send the DNS response back to the client if
+                # send the DNS response back to the client
                 self.udp_socket.sendto(response, source)
 
         while True:
