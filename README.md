@@ -12,11 +12,12 @@ The goal of this project is to build a Content Delivery Network (CDN) that can u
 # High Level Approach
 1. In Python, create a DNS server that can resolve an example CDN name and port. We will parse the incoming DNS question and then send answer in response by sending A type IP address.
 2. Ping each replica server to obtain latency and set resolve ip to the server with the lowest latency. (The resolved IP address is currently hardcoded.)
-3. In Python, create a simple HTTP server that will be served by all replica servers.
-4. The HTTP server will look in the cache directory for the request file. If it finds the file, it returns the cached file.
-5. If the requested file is not in cache, we retrieve it from the origin server. The server script will be given the hostname of the origin server. If the file is not found the we return 404.
-6. If the server is shut down, we will repopulate the cache based on the date the file was last modified. If the cache does not exist, we create a new directory and pre-populate it. And every time we access a file from the cache, we update the file's "last modified" attribute.
-7. We will also have Shell scripts to deploy, run and stop the CDN (i.e DNS and all replica HTTP servers)
+3. Send refused response for all other DNS queries.
+4. In Python, create a simple HTTP server that will be served by all replica servers.
+5. The HTTP server will look in the cache directory for the request file. If it finds the file, it returns the cached file.
+6. If the requested file is not in cache, we retrieve it from the origin server. The server script will be given the hostname of the origin server. If the file is not found the we return 404.
+7. If the server is shut down, we will repopulate the cache based on the date the file was last modified. If the cache does not exist, we create a new directory and pre-populate it. And every time we access a file from the cache, we update the file's "last modified" attribute.
+8. We will also have Shell scripts to deploy, run and stop the CDN (i.e DNS and all replica HTTP servers)
 
 # Testing Overview
 The testing of the project was done in three parts, namely HTTP server, DNS server and End-to-End testing.
