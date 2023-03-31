@@ -1,5 +1,5 @@
-# CS5700 Content Delivery Network
-Overview???
+# Content Delivery Network
+The goal of this project is to build a Content Delivery Network (CDN) that can use DNS redirection to efficiently redirect clients to the replica server with the shortest response time. This will be accomplished by developing a basic Web server capable of handling client requests for content. In addition, the project will create a system that analyzes network performance data, server load data, and cached data on servers to determine the best replica server. The time it takes to download the content, which will typically consist of small files like most Web sites, will be used to measure performance.
 
 # Requirements
 - Python 3.8+
@@ -9,12 +9,14 @@ Overview???
 - WGet/Curl (Testing)
 - WireShark (Testing)
 
-# Running
-???
-
 # High Level Approach
-???
-
+1. In Python, create a DNS server that can resolve an example CDN name and port. We will parse the incoming DNS question and then send answer in response by sending A type IP address.
+2. Ping each replica server to obtain latency and set resolve ip to the server with the lowest latency. (The resolved IP address is currently hardcoded.)
+3. In Python, create a simple HTTP server that will be served by all replica servers.
+4. The HTTP server will look in the cache directory for the request file. If it finds the file, it returns the cached file.
+5. If the requested file is not in cache, we retrieve it from the origin server. The server script will be given the hostname of the origin server. If the file is not found the we return 404.
+6. If the server is shut down, we will repopulate the cache based on the date the file was last modified. If the cache does not exist, we create a new directory and pre-populate it. And every time we access a file from the cache, we update the file's "last modified" attribute.
+7. We will also have Shell scripts to deploy, run and stop the CDN (i.e DNS and all replica HTTP servers)
 
 # Testing Overview
 The testing of the project was done in three parts, namely HTTP server, DNS server and End-to-End testing.
@@ -54,17 +56,20 @@ wget http://cs5700cdn.example.com:20200/2026_FIFA_World_Cup
 ```
 
 # Challenges
-- `httpserver`: The main challenge with the http server was figuring out the caching mechanism.
+- **httpserver**: The main challenge with the http server was figuring out the caching mechanism.
 Initially we went with the `pageviews.csv` file, however that proved to be quite inefficient because
 that csv was being loaded in every time the http server redirected a request to the origin server.
 Then the implementation changed to a time based LRU (i.e. if the file exists in the server, then the "last
 modified" date changes). The code for this was unnecessarily complicated, so we finally changed to
 using an OrderedDict() from python's `collections` module.
-- `dnsserver`:
+- **dnsserver**: Understanding the headers and payload for DNS requests and responses was a major challenge. I used WireShark to interpret the UDP packets and determine how to make it work. Another challenge was to test the DNS and HTTP servers jointly. We could test it all separately, but we wanted to see how everything worked together. For this, we devised end-to-end testing in isolation (details in testing overview).
+- **[deploy,run,stop]CDN**: Most of the stuff with this scrips was pretty simple. However, one minor challenge was understanding the use of SSH to deploy and run remote commands, as well as becoming acquainted with Shell script.
 
 # Work Breakdown
-- Ayush: all of httpserver and utils.py
-- 
+- Ayush: Implemented the core functionality of `httpserver` and created utilities (util.py) for codebase.
+- Shubham: Implemented the `dnsserver`, the [deploy,run,stop]CDN shell scripts and end-to-end testing.
 
 # Reference
-- httpserver: Python documentation for `urllib`, `os`, `csv`, `collections` and `socketserver` modules.
+1. Python documentation for `urllib`, `os`, `csv`, `collections` and `socketserver` modules.
+2. DNS query message format. Firewall.cx, Retrieved March 30, 2023, from https://www.firewall.cx/networking-topics/protocols/domain-name-system-dns/160-protocols-dns-query.html 
+3. DNS message format. GeeksforGeeks. Retrieved March 30, 2023, from https://www.geeksforgeeks.org/dns-message-format/ 
