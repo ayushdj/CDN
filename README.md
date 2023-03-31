@@ -68,7 +68,7 @@ using an OrderedDict() from python's `collections` module.
 
 # Work Breakdown
 - Ayush: Implemented the core functionality of `httpserver` and created utilities (util.py) for codebase.
-- Shubham: Implemented the `dnsserver`, the [deploy,run,stop]CDN shell scripts and end-to-end testing.
+- Shubham: Implemented the `dnsserver`, the `[deploy,run,stop]CDN` shell scripts and end-to-end testing.
 
 # Reference
 1. Python documentation for `urllib`, `os`, `csv`, `collections` and `socketserver` modules.
