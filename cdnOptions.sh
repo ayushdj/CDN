@@ -51,4 +51,12 @@ if [[ -z "$port" || -z "$origin" || -z "$name" || -z "$username" || -z "$keyfile
 fi
 
 # Define an array of replica servers
-replicas=("cdn-http4.5700.network")
+replicas=(
+"cdn-http1.5700.network"
+"cdn-http2.5700.network"
+"cdn-http3.5700.network"
+"cdn-http4.5700.network"
+"cdn-http5.5700.network"
+"cdn-http6.5700.network"
+"cdn-http7.5700.network"
+)

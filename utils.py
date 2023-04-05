@@ -1,5 +1,6 @@
 import os
-# from typing import Optional
+import time
+from typing import Callable
 
 CACHE_DIRECTORY = 'bitbusters_cache'
 
@@ -101,3 +102,28 @@ def find_recently_modified_files():
     file_list.sort(key=lambda x: os.path.getmtime(x[0]), reverse=False)
 
     return file_list
+
+
+def process_monitor(func: Callable) -> Callable:
+    """A decorator that wraps a function and continuously monitors its execution.
+
+    If the function throws an exception, it waits for 3 seconds and then tries again.
+    This allows the function to recover from transient errors and continue running.
+
+    Args:
+        func: The function to monitor and automatically recover from errors.
+
+    Returns:
+        A wrapped version of the input function that continuously monitors and retries it.
+    """
+    def wrapped(*args):
+        """The wrapped function that continuously monitors the input function."""
+        while True:
+            try:
+                func(*args)
+            except Exception as exp:
+                # If an exception is raised, wait for 3 seconds before retrying.
+                print(exp)
+            time.sleep(3)
+            print('Restarting process ...')
+    return wrapped
