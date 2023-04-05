@@ -8,9 +8,10 @@ Testing: dig @127.0.0.1 -p 20200 cs5700cdn.example.com
 import socket
 import argparse
 import asyncio
-import sys
 import struct
 from typing import Optional, Tuple
+
+from utils import process_monitor
 
 
 class DNSServer:
@@ -37,7 +38,7 @@ class DNSServer:
             self.udp_socket.bind((host, port))
         except socket.error as error:
             print('Error connecting to socket: ', error)
-            sys.exit(1)
+            raise error
 
     def recv(self) -> None:
         """
@@ -83,6 +84,14 @@ class DNSServer:
                 continue
             asyncio.run(dns_coroutine(data))
 
+    def close(self) -> None:
+        """Close the UDP socket.
+
+        This method closes the UDP socket that was opened.
+        """
+        self.udp_socket.close()
+
+    
     def create_dns_response(self, dns_query: bytes, resolved_ip_address: str) -> Optional[bytes]:
         """
         Create a DNS response packet for a given DNS query packet.
@@ -202,7 +211,7 @@ class DNSServer:
         # Return the answer packet as a bytes object
         return answer_packet
 
-
+@process_monitor
 def main(port: int, name: str):
     """
     The entry point of the program.
@@ -211,9 +220,15 @@ def main(port: int, name: str):
         port: The port number to listen on as an integer.
         name: The DNS server name as a string.
     """
-    dns_server = DNSServer(port, name)
-    # start listening for and responding to DNS queries
-    dns_server.recv()
+    dns_server = None
+    try:
+        dns_server = DNSServer(port, name)
+        # start listening for and responding to DNS queries
+        dns_server.recv()
+    except Exception as exp:
+        if dns_server:
+            dns_server.close()
+        raise exp
 
 
 if __name__ == "__main__":
