@@ -11,6 +11,7 @@ import asyncio
 import struct
 from typing import Optional, Tuple
 
+
 from utils import process_monitor
 
 
@@ -32,6 +33,15 @@ class DNSServer:
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.name = name
         self.port = port
+        self.replica_servers = [
+                                "cdn-http1.5700.network",
+                                "cdn-http2.5700.network",
+                                "cdn-http3.5700.network",
+                                "cdn-http4.5700.network",
+                                "cdn-http5.5700.network",
+                                "cdn-http6.5700.network",
+                                "cdn-http7.5700.network",
+                                ]
         try:
             host = '0.0.0.0'
             # bind the socket to the specified port and IP address
@@ -64,7 +74,8 @@ class DNSServer:
 
             # pre-defined IP address to resolve DNS queries
             # Note: This is currently hard coded. Final submission will have find best ip address logic.
-            dns_resolved_ip = "50.116.39.110"
+            # dns_resolved_ip = "50.116.39.110"
+            dns_resolved_ip = self.find_closest_ip_address()
 
             # the DNS query received from the client
             dns_query = data[0]
@@ -181,6 +192,36 @@ class DNSServer:
         # Return the domain name, length of the domain name, query type,
         # and query class as a tuple
         return domain_name, end + 5, query_type, query_class
+
+    def find_closest_ip_address(self) -> str:
+        """
+        Find the HTTP server IP address that is closest to the client by computing the RTT
+        for each IP address and selecting the IP address with the minimum RTT.
+
+        Args:
+            resolved_ip_addresses: A list of IP addresses of the HTTP servers.
+
+        Returns:
+            str: The IP address of the HTTP server that is closest to the client.
+        """
+        # Initialize the minimum RTT to a very large value
+        min_rtt = float('inf')
+        closest_ip_address = None
+
+        # Ping each IP address and compute the RTT
+        for ip_address in self.replica_servers:
+            rtt = self._ping(ip_address)
+
+            # If the RTT is smaller than the current minimum, update the minimum RTT
+            # and the closest IP address
+            if rtt is not None and rtt < min_rtt:
+                min_rtt = rtt
+                closest_ip_address = ip_address
+
+        return closest_ip_address
+
+    def _ping(self, ip_address):
+        return 1
 
     def create_answer_packet(self, resolved_ip_address: str, query: bytes,
                              query_type: int, query_class: int):
