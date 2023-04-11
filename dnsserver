@@ -12,7 +12,6 @@ import struct
 from typing import Optional, Tuple
 import time
 
-
 from utils import process_monitor
 
 
@@ -35,14 +34,14 @@ class DNSServer:
         self.name = name
         self.port = port
         self.replica_servers = [
-                                "cdn-http1.5700.network",
-                                "cdn-http2.5700.network",
-                                "cdn-http3.5700.network",
-                                "cdn-http4.5700.network",
-                                "cdn-http5.5700.network",
-                                "cdn-http6.5700.network",
-                                "cdn-http7.5700.network",
-                                ]
+            "cdn-http1.5700.network",
+            "cdn-http2.5700.network",
+            "cdn-http3.5700.network",
+            "cdn-http4.5700.network",
+            "cdn-http5.5700.network",
+            "cdn-http6.5700.network",
+            "cdn-http7.5700.network",
+        ]
         try:
             host = '0.0.0.0'
             # bind the socket to the specified port and IP address
@@ -103,7 +102,6 @@ class DNSServer:
         """
         self.udp_socket.close()
 
-    
     def create_dns_response(self, dns_query: bytes, resolved_ip_address: str) -> Optional[bytes]:
         """
         Create a DNS response packet for a given DNS query packet.
@@ -131,11 +129,11 @@ class DNSServer:
 
         # Create the answer packet
         answers = self.create_answer_packet(
-            resolved_ip_address, dns_query[start:start+end], query_type, query_class)
+            resolved_ip_address, dns_query[start:start + end], query_type, query_class)
 
         # Create the response header and Return the DNS response packet
         header = dns_query[0:2] + b"\x81\x80" + \
-            struct.pack('!HHHH', no_of_questions, no_of_que_answered, 0, 0)
+                 struct.pack('!HHHH', no_of_questions, no_of_que_answered, 0, 0)
         return header + answers
 
     def create_refused_response(self, dns_query: bytes) -> bytes:
@@ -187,94 +185,67 @@ class DNSServer:
             length_field = field[end]  # get the next length field
 
         # Get the query type and query class fields
-        query_type = struct.unpack('!H', field[end+1:end+3])[0]
-        query_class = struct.unpack('!H', field[end+3:end+5])[0]
+        query_type = struct.unpack('!H', field[end + 1:end + 3])[0]
+        query_class = struct.unpack('!H', field[end + 3:end + 5])[0]
 
         # Return the domain name, length of the domain name, query type,
         # and query class as a tuple
         return domain_name, end + 5, query_type, query_class
 
     def find_closest_ip_address(self) -> str:
-        """
-        Find the HTTP server IP address that is closest to the client by computing the RTT
-        for each IP address and selecting the IP address with the minimum RTT.
 
-        Args:
-            resolved_ip_addresses: A list of IP addresses of the HTTP servers.
-
-        Returns:
-            str: The IP address of the HTTP server that is closest to the client.
-        """
-        # Initialize the minimum RTT to a very large value
-        min_rtt = float('inf')
+        minimum_time_taken_to_ping = float('inf')
         closest_ip_address = None
 
-        # Ping each IP address and compute the RTT
         for ip_address in self.replica_servers:
-            rtt = self._ping(ip_address)
+            current_total_time_take = self._ping(ip_address)
 
-            # If the RTT is smaller than the current minimum, update the minimum RTT
-            # and the closest IP address
-            if rtt is not None and rtt < min_rtt:
-                min_rtt = rtt
+            if current_total_time_take is not None and current_total_time_take < minimum_time_taken_to_ping:
+                minimum_time_taken_to_ping = current_total_time_take
                 closest_ip_address = ip_address
 
         return closest_ip_address
 
-    def _ping(self, ip_address):
-        # return 1
-        """
-            Check if a host is reachable by sending an ICMP echo request (ping) packet.
+    def _ping(self, destination_ip_address) -> float | None:
 
-            Args:
-                host (str): The host to ping.
+        my_sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+        my_sock.settimeout(1)
 
-            Returns:
-                bool: True if the host is reachable, False otherwise.
-            """
-        # Create a socket object
-        sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
-        sock.settimeout(1)  # Set a timeout of 1 second
-
-        # Create an ICMP echo request (ping) packet
-        packet_id = int((id(time.time()) % 65535))
-        packet_checksum = 0
-        packet_header = struct.pack('bbHHh', 8, 0, packet_checksum, packet_id, 1)
-        packet_data = b'PingPacket'
-        packet_checksum = self.calc_checksum(packet_header + packet_data)
-        packet_header = struct.pack('bbHHh', 8, 0, socket.htons(packet_checksum), packet_id, 1)
-        packet = packet_header + packet_data
+        checksum = self.calc_checksum(struct.pack('bbHHh', 8, 0, 0, 42069, 1) + b'TestingTesting123')
+        checksum = socket.htons(checksum)
+        packet = struct.pack('bbHHh', 8, 0, checksum, 42069, 1) + b'TestingTesting123'
 
         # Send the packet to the host
         try:
-            sock.sendto(packet, (ip_address, 0))
-            sock.recvfrom(1024)  # Wait for a response
+            begin = time.time()
+            my_sock.sendto(packet, (destination_ip_address, 0))
+            my_sock.recvfrom(1024)
+            end = time.time()
+            total_ping_time = (end - begin) * 1000
+            return total_ping_time
 
-            # If we receive a response, the host is reachable
-            return True
 
         except socket.timeout:
-            # If we don't receive a response within the timeout, the host is unreachable
-            return False
+            print("Timeout. Couldn't connect to IP address ", destination_ip_address)
+            return None
 
-    def calc_checksum(self, data):
+    def calc_checksum(self, message):
         """
         Calculate the checksum of a packet.
 
         Args:
-            data (bytes): The packet data.
+            message: The packet data.
 
         Returns:
-            int: The checksum value.
+            the checksum
         """
-        if len(data) % 2 == 1:
-            data += b'\x00'
+        if len(message) % 2 == 1:
+            message += b'\x00'
 
         checksum = 0
-        for i in range(0, len(data), 2):
-            word = (data[i] << 8) + data[i + 1]
-            checksum += word
-            checksum = (checksum >> 16) + (checksum & 0xffff)
+        for i in range(0, len(message), 2):
+            checksum += message[i] + (message[i + 1] << 8)
+            checksum = (checksum & 0xffff) + (checksum >> 16)
 
         return ~checksum & 0xffff
 
@@ -307,6 +278,7 @@ class DNSServer:
         # Return the answer packet as a bytes object
         return answer_packet
 
+
 @process_monitor
 def main(port: int, name: str):
     """
@@ -328,7 +300,6 @@ def main(port: int, name: str):
 
 
 if __name__ == "__main__":
-
     # specify the default port number and the cdn name
     DEFAULT_PORT = 20200
     DEFAULT_NAME = 'cs5700cdn.example.com'
