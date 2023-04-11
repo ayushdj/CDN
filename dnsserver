@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import struct
 from typing import Optional, Tuple
+import time
 
 
 from utils import process_monitor
@@ -74,8 +75,8 @@ class DNSServer:
 
             # pre-defined IP address to resolve DNS queries
             # Note: This is currently hard coded. Final submission will have find best ip address logic.
-            # dns_resolved_ip = "50.116.39.110"
-            dns_resolved_ip = self.find_closest_ip_address()
+            dns_resolved_ip = "50.116.39.110"
+            # dns_resolved_ip = self.find_closest_ip_address()
 
             # the DNS query received from the client
             dns_query = data[0]
@@ -221,7 +222,61 @@ class DNSServer:
         return closest_ip_address
 
     def _ping(self, ip_address):
-        return 1
+        # return 1
+        """
+            Check if a host is reachable by sending an ICMP echo request (ping) packet.
+
+            Args:
+                host (str): The host to ping.
+
+            Returns:
+                bool: True if the host is reachable, False otherwise.
+            """
+        # Create a socket object
+        sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+        sock.settimeout(1)  # Set a timeout of 1 second
+
+        # Create an ICMP echo request (ping) packet
+        packet_id = int((id(time.time()) % 65535))
+        packet_checksum = 0
+        packet_header = struct.pack('bbHHh', 8, 0, packet_checksum, packet_id, 1)
+        packet_data = b'PingPacket'
+        packet_checksum = self.calc_checksum(packet_header + packet_data)
+        packet_header = struct.pack('bbHHh', 8, 0, socket.htons(packet_checksum), packet_id, 1)
+        packet = packet_header + packet_data
+
+        # Send the packet to the host
+        try:
+            sock.sendto(packet, (ip_address, 0))
+            sock.recvfrom(1024)  # Wait for a response
+
+            # If we receive a response, the host is reachable
+            return True
+
+        except socket.timeout:
+            # If we don't receive a response within the timeout, the host is unreachable
+            return False
+
+    def calc_checksum(self, data):
+        """
+        Calculate the checksum of a packet.
+
+        Args:
+            data (bytes): The packet data.
+
+        Returns:
+            int: The checksum value.
+        """
+        if len(data) % 2 == 1:
+            data += b'\x00'
+
+        checksum = 0
+        for i in range(0, len(data), 2):
+            word = (data[i] << 8) + data[i + 1]
+            checksum += word
+            checksum = (checksum >> 16) + (checksum & 0xffff)
+
+        return ~checksum & 0xffff
 
     def create_answer_packet(self, resolved_ip_address: str, query: bytes,
                              query_type: int, query_class: int):
