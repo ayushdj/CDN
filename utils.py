@@ -1,10 +1,11 @@
 import os
 import ipaddress
+import sys
 import requests
 import json
 import math
 import time
-from typing import Callable
+from typing import Callable, Optional
 
 CACHE_DIRECTORY = 'bitbusters_cache'
 
@@ -185,3 +186,34 @@ def get_dist_between(ip1: str, ip2: str) -> float:
         return distance
     except Exception:
         return -1
+    
+    
+class MemCache:
+    
+    def __init__(self, capacity: int):
+        self.capacity = capacity
+        self.tm = 0
+        self.cache = {}
+        self.lru = {}
+
+    def get(self, key: str) -> Optional[str]:
+        if key in self.cache:
+            self.lru[key] = self.tm
+            self.tm += 1
+            return self.cache[key]
+        return None
+    
+    def has(self, key: str) -> bool:
+        return key in self.lru
+    
+    def keys(self) -> list:
+        return list(self.lru.keys())
+
+    def set(self, key: str, value: str) -> None:
+        if len(self.cache) >= sys.getsizeof(self.lru):
+            old_key = min(self.lru.keys(), key=lambda k:self.lru[k])
+            self.cache.pop(old_key)
+            self.lru.pop(old_key)
+        self.cache[key] = value
+        self.lru[key] = self.tm
+        self.tm += 1
