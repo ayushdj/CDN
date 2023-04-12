@@ -3,8 +3,6 @@
 '''
 Start: ./dnsserver -p 20200 -n cs5700cdn.example.com
 Testing: dig @127.0.0.1 -p 20200 cs5700cdn.example.com
-
-http://ip-api.com/json/13.244.117.91
 '''
 
 import socket
