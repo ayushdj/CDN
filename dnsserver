@@ -10,8 +10,9 @@ import argparse
 import asyncio
 import struct
 from typing import Optional, Tuple
-
-from utils import process_monitor
+import asyncio
+import requests
+from utils import *
 
 
 class DNSServer:
@@ -32,6 +33,16 @@ class DNSServer:
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.name = name
         self.port = port
+        self.replica_servers = [
+            "cdn-http1.5700.network",
+            "cdn-http2.5700.network",
+            "cdn-http3.5700.network",
+            "cdn-http4.5700.network",
+            "cdn-http5.5700.network",
+            "cdn-http6.5700.network",
+            "cdn-http7.5700.network",
+        ]
+        self.closest_ip_address = {}
         try:
             host = '0.0.0.0'
             # bind the socket to the specified port and IP address
@@ -61,10 +72,9 @@ class DNSServer:
             """
             # get the source address of the incoming data
             source = data[1]
-
-            # pre-defined IP address to resolve DNS queries
-            # Note: This is currently hard coded. Final submission will have find best ip address logic.
-            dns_resolved_ip = "50.116.39.110"
+            
+            # closest IP address to resolve DNS queries
+            dns_resolved_ip = await self.find_closest_ip_address(source[0])
 
             # the DNS query received from the client
             dns_query = data[0]
@@ -91,7 +101,6 @@ class DNSServer:
         """
         self.udp_socket.close()
 
-    
     def create_dns_response(self, dns_query: bytes, resolved_ip_address: str) -> Optional[bytes]:
         """
         Create a DNS response packet for a given DNS query packet.
@@ -119,11 +128,11 @@ class DNSServer:
 
         # Create the answer packet
         answers = self.create_answer_packet(
-            resolved_ip_address, dns_query[start:start+end], query_type, query_class)
+            resolved_ip_address, dns_query[start:start + end], query_type, query_class)
 
         # Create the response header and Return the DNS response packet
         header = dns_query[0:2] + b"\x81\x80" + \
-            struct.pack('!HHHH', no_of_questions, no_of_que_answered, 0, 0)
+                 struct.pack('!HHHH', no_of_questions, no_of_que_answered, 0, 0)
         return header + answers
 
     def create_refused_response(self, dns_query: bytes) -> bytes:
@@ -175,15 +184,83 @@ class DNSServer:
             length_field = field[end]  # get the next length field
 
         # Get the query type and query class fields
-        query_type = struct.unpack('!H', field[end+1:end+3])[0]
-        query_class = struct.unpack('!H', field[end+3:end+5])[0]
+        query_type = struct.unpack('!H', field[end + 1:end + 3])[0]
+        query_class = struct.unpack('!H', field[end + 3:end + 5])[0]
 
         # Return the domain name, length of the domain name, query type,
         # and query class as a tuple
         return domain_name, end + 5, query_type, query_class
 
+    async def find_closest_ip_address(self, source_ip_address: str) -> str:
+        """
+        Finds the closest HTTP server to a given source IP address using a 
+        combination of RTT and distance.
+
+        Args:
+            source_ip_address: A string representing the source IP address.
+
+        Returns:
+            A string representing the IP address of the closest HTTP server to 
+            the source IP address.
+        """
+        if source_ip_address in self.closest_ip_address:
+            return self.closest_ip_address[source_ip_address]
+        
+        async def ping(http_server: str):
+            """
+            Asynchronously pings an HTTP server and returns the response time in seconds.
+
+            Args:
+                http_server: A string representing the address of HTTP server to ping.
+
+            Returns:
+                A tuple containing the IP address or hostname of the HTTP server 
+                and the response time in seconds.
+            """
+            url = f'http://{http_server}:{self.port}/rtt/{source_ip_address}'
+            response = requests.get(url)
+            if response.status_code == 200:
+                return (http_server, float(response.text))
+            else:
+                return (http_server, -1)
+        
+        async def dist(http_server: str):
+            """
+            Asynchronously calculates the distance between an HTTP server 
+            and a source IP address using a geolocation API.
+
+            Args:
+                http_server: A string representing the IP address or hostname of 
+                the HTTP server to calculate the distance to.
+
+            Returns:
+                A tuple containing the IP address or hostname of the 
+                HTTP server and the distance in meters.
+            """
+            d = get_dist_between(http_server, source_ip_address)
+            return (http_server, d)
+
+        async def find_closest_http_server():
+            """
+            Asynchronously finds the closest HTTP server to a source IP address 
+            using a combination of RTT and distance.
+
+            Returns:
+                A string representing the IP address of the closest HTTP server 
+                to the source IP address.
+            """
+            tasks = [asyncio.create_task(dist(x)) for x in self.replica_servers]
+            responses = await asyncio.gather(*tasks)
+            http_server_ip, val = min(responses, key=lambda x: x[1])
+            return http_server_ip
+        
+        res = await find_closest_http_server()
+        closest_ip = res if is_valid_ip(res) else socket.gethostbyname(res)
+        self.closest_ip_address[source_ip_address] = closest_ip
+        return closest_ip
+
     def create_answer_packet(self, resolved_ip_address: str, query: bytes,
-                             query_type: int, query_class: int):
+                            query_type: int, query_class: int):
         """
         Create a DNS answer packet with the resolved IP address.
 
@@ -211,6 +288,7 @@ class DNSServer:
         # Return the answer packet as a bytes object
         return answer_packet
 
+
 @process_monitor
 def main(port: int, name: str):
     """
@@ -232,7 +310,6 @@ def main(port: int, name: str):
 
 
 if __name__ == "__main__":
-
     # specify the default port number and the cdn name
     DEFAULT_PORT = 20200
     DEFAULT_NAME = 'cs5700cdn.example.com'
