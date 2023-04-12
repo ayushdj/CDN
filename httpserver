@@ -138,6 +138,9 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
             # Write the content of the file to the file we're creating and close the file out.
             file.write(data)
             file.close()
+            
+    def log_message(self, format, *args):
+        return
 
 @process_monitor
 def main(server_port_number: int):
