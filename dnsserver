@@ -10,9 +10,9 @@ import argparse
 import asyncio
 import struct
 from typing import Optional, Tuple
-import time
-
-from utils import process_monitor
+import asyncio
+import requests
+from utils import *
 
 
 class DNSServer:
@@ -42,6 +42,7 @@ class DNSServer:
             "cdn-http6.5700.network",
             "cdn-http7.5700.network",
         ]
+        self.closest_ip_address = {}
         try:
             host = '0.0.0.0'
             # bind the socket to the specified port and IP address
@@ -71,11 +72,9 @@ class DNSServer:
             """
             # get the source address of the incoming data
             source = data[1]
-
-            # pre-defined IP address to resolve DNS queries
-            # Note: This is currently hard coded. Final submission will have find best ip address logic.
-            dns_resolved_ip = "50.116.39.110"
-            # dns_resolved_ip = self.find_closest_ip_address(source)
+            
+            # closest IP address to resolve DNS queries
+            dns_resolved_ip = await self.find_closest_ip_address(source[0])
 
             # the DNS query received from the client
             dns_query = data[0]
@@ -192,66 +191,76 @@ class DNSServer:
         # and query class as a tuple
         return domain_name, end + 5, query_type, query_class
 
-    def find_closest_ip_address(self, source_ip_address) -> str:
-
-        minimum_time_taken_to_ping = float('inf')
-        closest_ip_address = None
-
-        for http_server_ip_address in self.replica_servers:
-            current_total_time_take = self._ping(source_ip_address, http_server_ip_address)
-
-            if current_total_time_take is not None and current_total_time_take < minimum_time_taken_to_ping:
-                minimum_time_taken_to_ping = current_total_time_take
-                closest_ip_address = http_server_ip_address
-
-        return closest_ip_address
-
-    def _ping(self, source_ip_address, destination_ip_address) -> float | None:
-
-        my_sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
-        my_sock.settimeout(1)
-
-        checksum = self.calc_checksum(struct.pack('bbHHh', 8, 0, 0, 42069, 1) + b'TestingTesting123')
-        checksum = socket.htons(checksum)
-        packet = struct.pack('bbHHh', 8, 0, checksum, 42069, 1) + b'TestingTesting123'
-        my_sock.bind((source_ip_address, 0))
-
-        # Send the packet to the host
-        try:
-            begin = time.time()
-            my_sock.sendto(packet, (destination_ip_address, 0))
-            my_sock.recvfrom(1024)
-            end = time.time()
-            total_ping_time = (end - begin) * 1000
-            return total_ping_time
-
-
-        except socket.timeout:
-            print("Timeout. Couldn't connect to IP address ", destination_ip_address)
-            return None
-
-    def calc_checksum(self, message):
+    async def find_closest_ip_address(self, source_ip_address: str) -> str:
         """
-        Calculate the checksum of a packet.
+        Finds the closest HTTP server to a given source IP address using a 
+        combination of RTT and distance.
 
         Args:
-            message: The packet data.
+            source_ip_address: A string representing the source IP address.
 
         Returns:
-            the checksum
+            A string representing the IP address of the closest HTTP server to 
+            the source IP address.
         """
-        if len(message) % 2 == 1:
-            message += b'\x00'
+        if source_ip_address in self.closest_ip_address:
+            return self.closest_ip_address[source_ip_address]
+        
+        async def ping(http_server: str):
+            """
+            Asynchronously pings an HTTP server and returns the response time in seconds.
 
-        checksum = 0
-        for i in range(0, len(message), 2):
-            checksum += message[i] + (message[i + 1] << 8)
-            checksum = (checksum & 0xffff) + (checksum >> 16)
+            Args:
+                http_server: A string representing the address of HTTP server to ping.
 
-        return ~checksum & 0xffff
+            Returns:
+                A tuple containing the IP address or hostname of the HTTP server 
+                and the response time in seconds.
+            """
+            url = f'http://{http_server}:{self.port}/rtt/{source_ip_address}'
+            response = requests.get(url)
+            if response.status_code == 200:
+                return (http_server, float(response.text))
+            else:
+                return (http_server, -1)
+        
+        async def dist(http_server: str):
+            """
+            Asynchronously calculates the distance between an HTTP server 
+            and a source IP address using a geolocation API.
+
+            Args:
+                http_server: A string representing the IP address or hostname of 
+                the HTTP server to calculate the distance to.
+
+            Returns:
+                A tuple containing the IP address or hostname of the 
+                HTTP server and the distance in meters.
+            """
+            d = get_dist_between(http_server, source_ip_address)
+            return (http_server, d)
+
+        async def find_closest_http_server():
+            """
+            Asynchronously finds the closest HTTP server to a source IP address 
+            using a combination of RTT and distance.
+
+            Returns:
+                A string representing the IP address of the closest HTTP server 
+                to the source IP address.
+            """
+            tasks = [asyncio.create_task(dist(x)) for x in self.replica_servers]
+            responses = await asyncio.gather(*tasks)
+            http_server_ip, val = min(responses, key=lambda x: x[1])
+            return http_server_ip
+        
+        res = await find_closest_http_server()
+        closest_ip = res if is_valid_ip(res) else socket.gethostbyname(res)
+        self.closest_ip_address[source_ip_address] = closest_ip
+        return closest_ip
 
     def create_answer_packet(self, resolved_ip_address: str, query: bytes,
-                             query_type: int, query_class: int):
+                            query_type: int, query_class: int):
         """
         Create a DNS answer packet with the resolved IP address.
 
