@@ -1,9 +1,27 @@
+import ipaddress
 import os
+import requests
+import json
+import math
 import time
 from typing import Callable
+import time
 
 CACHE_DIRECTORY = 'bitbusters_cache'
 
+
+def get_rtt(hostname: str) -> float:
+    """This function calculates the Round Trip Time (RTT) to a given host using the ping command"""
+    # Ping the host and capture the output
+    ping_command = f"ping -c 1 -W 0.5 {hostname} | grep -E -i '^(rtt|round-trip)'"
+    stats = os.popen(ping_command).read()
+    # try:
+    if stats:
+        min, avg, max, std_dev  = stats.split(" = ")[1].replace("ms", "").strip().split("/")
+        return float(avg)
+    return -1
+    # except:
+    #     return -1
 
 def size_of_cache_directory():
     """
@@ -73,6 +91,22 @@ def find_recently_modified_files():
 
     return file_list
 
+def is_valid_ip(address: str) -> bool:
+    """
+    Checks if a given string is a valid IP address.
+
+    Args:
+        address: A string containing an IP address.
+
+    Returns:
+        A boolean value indicating whether the input string is a valid IP address.
+        Returns True if the input string is a valid IP address, False otherwise.
+    """
+    try:
+        ipaddress.ip_address(address)
+        return True
+    except ValueError:
+        return False
 
 def process_monitor(func: Callable) -> Callable:
     """A decorator that wraps a function and continuously monitors its execution.
@@ -97,3 +131,58 @@ def process_monitor(func: Callable) -> Callable:
             time.sleep(3)
             print('Restarting process ...')
     return wrapped
+
+def get_dist_between(ip1: str, ip2: str) -> float:
+    """
+    Calculates the distance in meters between two IP addresses using 
+    the haversine formula and the IP-API geolocation API.
+
+    Args:
+        ip1: A string representing the first IP address.
+        ip2: A string representing the second IP address.
+
+    Returns:
+        A float representing the distance in meters between the 
+        two IP addresses, or -1 if an error occurs.
+    """
+    try:
+        IP_API = 'http://ip-api.com/json/'
+
+        # Construct the API request URL
+        url = f'{IP_API}{ip1}'
+
+        # Set up the HTTP headers
+        headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+
+        # Make the first API request to get the location data for the first IP address
+        response1 = requests.get(url, headers=headers)
+        data1 = json.loads(response1.text)
+
+        # Make the second API request to get the location data for the second IP address
+        url = f'{IP_API}{ip2}'
+        response2 = requests.get(url, headers=headers)
+        data2 = json.loads(response2.text)
+
+        # Extract the latitude and longitude data from the location data for each IP address
+        lat1 = data1['lat']
+        lon1 = data1['lon']
+        lat2 = data2['lat']
+        lon2 = data2['lon']
+
+        # Calculate the distance between the two locations using the haversine formula
+        R = 6371e3
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        delta_phi = math.radians(lat2 - lat1)
+        delta_lambda = math.radians(lon2 - lon1)
+
+        a = math.sin(delta_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        distance = R * c
+        return distance
+    except Exception:
+        return -1
