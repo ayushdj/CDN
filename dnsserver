@@ -36,13 +36,13 @@ class DNSServer:
         self.name = name
         self.port = port
         self.replica_servers = [
-            "172.105.14.10",
-            "172.105.166.172",
-            "96.126.97.250",
-            "50.116.39.110",
-            "172.105.229.35",
-            "192.46.210.101",
-            "139.162.235.21",
+            "cdn-http1.5700.network",
+            "cdn-http2.5700.network",
+            "cdn-http3.5700.network",
+            "cdn-http4.5700.network",
+            "cdn-http5.5700.network",
+            "cdn-http6.5700.network",
+            "cdn-http7.5700.network",
         ]
         self.closest_ip_address = {}
         try:
@@ -256,10 +256,10 @@ class DNSServer:
             http_server_ip, val = min(responses, key=lambda x: x[1])
             return http_server_ip
         
-        closest_http_ip = await find_closest_http_server()
-        self.closest_ip_address[source_ip_address] = closest_http_ip
-        
-        return closest_http_ip
+        res = await find_closest_http_server()
+        closest_ip = res if is_valid_ip(res) else socket.gethostbyname(res)
+        self.closest_ip_address[source_ip_address] = closest_ip
+        return closest_ip
 
     def create_answer_packet(self, resolved_ip_address: str, query: bytes,
                             query_type: int, query_class: int):
