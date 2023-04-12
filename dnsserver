@@ -261,26 +261,6 @@ class DNSServer:
         
         return closest_http_ip
 
-    def calc_checksum(self, message):
-        """
-        Calculate the checksum of a packet.
-
-        Args:
-            message: The packet data.
-
-        Returns:
-            the checksum
-        """
-        if len(message) % 2 == 1:
-            message += b'\x00'
-
-        checksum = 0
-        for i in range(0, len(message), 2):
-            checksum += message[i] + (message[i + 1] << 8)
-            checksum = (checksum & 0xffff) + (checksum >> 16)
-
-        return ~checksum & 0xffff
-
     def create_answer_packet(self, resolved_ip_address: str, query: bytes,
                             query_type: int, query_class: int):
         """

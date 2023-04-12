@@ -1,11 +1,10 @@
-import ipaddress
 import os
+import ipaddress
 import requests
 import json
 import math
 import time
 from typing import Callable
-import time
 
 CACHE_DIRECTORY = 'bitbusters_cache'
 
