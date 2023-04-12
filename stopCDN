@@ -10,13 +10,13 @@ source $(dirname $0)/cdnOptions.sh
 function stop_httpserver {
   hostname=$1
   echo "Stopping HTTP server on $hostname"
-  ssh -oBatchMode=yes -i $keyfile $username@$hostname "kill \$(lsof -t -i :$port)"
+  ssh $ssh_options -i $keyfile $username@$hostname "kill \$(lsof -t -i :$port)"
 }
 
 # Stop the DNS server
 dns_hostname='cdn-dns.5700.network'
 echo "Stopping DNS server on $dns_hostname"
-ssh -oBatchMode=yes -i $keyfile $username@$dns_hostname "kill \$(lsof -t -i :$port)"
+ssh $ssh_options -i $keyfile $username@$dns_hostname "kill \$(lsof -t -i :$port)"
 
 # Stop HTTP servers from the replicas array
 for value in "${replicas[@]}"
