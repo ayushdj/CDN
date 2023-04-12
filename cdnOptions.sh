@@ -60,3 +60,5 @@ replicas=(
 "cdn-http6.5700.network"
 "cdn-http7.5700.network"
 )
+
+ssh_options='-oBatchMode=yes -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oLogLevel=ERROR'
