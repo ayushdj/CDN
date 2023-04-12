@@ -84,7 +84,9 @@ def find_recently_modified_files():
         for file in files:
             file_path = os.path.join(root, file)
             file_size = os.path.getsize(file_path)
-            file_list.append((file_path, file_size))
+            with open(file_path, 'r') as f:
+                file_content = f.read()
+            file_list.append((file_path, file_size, file_content))
 
     # Sort the list of files based on their modification time, with the most recently modified file last
     file_list.sort(key=lambda x: os.path.getmtime(x[0]), reverse=False)

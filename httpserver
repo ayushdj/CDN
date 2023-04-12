@@ -21,7 +21,7 @@ MY_SERVER_NAME = 'cdn-http4.5700.network'
 ORIGIN_SERVER = 'cs5700cdnorigin.ccs.neu.edu:8080'
 DISK_SIZE_LIMIT = 20000000
 ORDERED_CACHE_FILES = OrderedDict()
-MEM_CACHE_FILES = MemCache(DISK_SIZE_LIMIT)
+
 
 class ReplicaHTTPServer(BaseHTTPRequestHandler):
     """
@@ -59,36 +59,32 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
         if filepath == 'grading/beacon':
             self._send_information_over(204, '<html><body><h1>NO CONTENT.</h1></body></html>')
             return
-        
+
         # send rtt time for input ip address
         url_parts = self.path[1:].split('/')
         if url_parts[0] == 'rtt':
             src_ip = url_parts[1]
             if is_valid_ip(src_ip):
-                rtt =  get_rtt(src_ip)
+                rtt = get_rtt(src_ip)
                 self._send_information_over(200, str(rtt))
             else:
                 self._send_information_over(400, '<html><body><h1>Invalid Request</h1></body></html>')
             return
 
-        if MEM_CACHE_FILES.has(filepath):
-            self._send_information_over(200, MEM_CACHE_FILES.get(filepath))
-            return
-        
         # if the file we're looking for exists in the disk cache, then pull the data
         # from there, otherwise go to the Origin server and pull the data from there.
         if f'{CACHE_DIRECTORY}/{filepath}' in ORDERED_CACHE_FILES:
             # open the file from the cache
-            with open(f'{current_directory}/{CACHE_DIRECTORY}/{filepath}', 'r') as file:
-                file_lines = file.readlines()
+            # with open(f'{current_directory}/{CACHE_DIRECTORY}/{filepath}', 'r') as file:
+            #     file_lines = file.readlines()
+            actual_file_content = ORDERED_CACHE_FILES[f'{CACHE_DIRECTORY}/{filepath}'][1]
 
             # join the string list and send the data back out.
-            joined_result = "".join(file_lines)
-            MEM_CACHE_FILES.set(filepath, joined_result)
-            self._send_information_over(200, joined_result)
+            # joined_result = "".join(file_lines)
+            self._send_information_over(200, actual_file_content)
             # add the data to the cache
-            size = ORDERED_CACHE_FILES.pop(f'{CACHE_DIRECTORY}/{filepath}')
-            ORDERED_CACHE_FILES[f'{CACHE_DIRECTORY}/{filepath}'] = size
+            size, file_content = ORDERED_CACHE_FILES.pop(f'{CACHE_DIRECTORY}/{filepath}')
+            ORDERED_CACHE_FILES[f'{CACHE_DIRECTORY}/{filepath}'] = (size, file_content)
 
             # we change the file's "last modified" time, because when we
             # restart the server, we will need to sort the cache based on that time
@@ -107,7 +103,6 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                 headers = response.info()
                 result = data.decode()
                 # send the data over
-                MEM_CACHE_FILES.set(filepath, result)
                 self._send_information_over(response.status, result)
 
         except Exception as e:
@@ -124,15 +119,16 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
         # cache plus the new file size is greater than the disk size limit, we need to start removing items from the
         # head of the cache.
         while len(ORDERED_CACHE_FILES) > 0 \
-                and int(sum(ORDERED_CACHE_FILES.values())) + int(headers['Content-Length']) > DISK_SIZE_LIMIT:
+                and int(sum(size for size, _ in ORDERED_CACHE_FILES.values())) + int(headers['Content-Length']) \
+                > DISK_SIZE_LIMIT:
             # extract the least recently used file
-            (file_to_remove_path, size) = ORDERED_CACHE_FILES.popitem(last=False)
+            (file_to_remove_path, (size, file_content)) = ORDERED_CACHE_FILES.popitem(last=False)
 
             # delete that file
             delete_file(file_to_remove_path)
 
         # add the file to the cache.
-        ORDERED_CACHE_FILES[f'{CACHE_DIRECTORY}/{filepath}'] = int(headers['Content-Length'])
+        ORDERED_CACHE_FILES[f'{CACHE_DIRECTORY}/{filepath}'] = (int(headers['Content-Length']), data)
 
         # extract the directory path and the name of the file and make the directory.
         dir_path, file_name = os.path.split(filepath)
@@ -143,10 +139,11 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
             # Write the content of the file to the file we're creating and close the file out.
             file.write(data)
             file.close()
-            
+
     def log_message(self, format, *args):
         print(datetime.datetime.now(), *args)
         return
+
 
 @process_monitor
 def main(server_port_number: int):
@@ -177,8 +174,9 @@ def main(server_port_number: int):
     cached_files = find_recently_modified_files()
 
     for file in cached_files:
-        ORDERED_CACHE_FILES[file[0]] = file[1]
-    
+        ORDERED_CACHE_FILES[file[0]] = (file[1], file[2])
+
+
     with socketserver.TCPServer(('0.0.0.0', server_port_number), ReplicaHTTPServer) as httpd:
         print('Serving at port', server_port_number)
         httpd.serve_forever()
