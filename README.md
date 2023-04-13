@@ -61,14 +61,18 @@ wget http://cs5700cdn.example.com:20200/2026_FIFA_World_Cup
 ```
 
 # Challenges
-- **httpserver**: The main challenge with the http server was figuring out the caching mechanism.
-Initially we went with the `pageviews.csv` file, however that proved to be quite inefficient because
+- **httpserver**: 
+  - The main challenge with the http server was figuring out the caching mechanism.
+  - Initially we went with the `pageviews.csv` file, however that proved to be quite inefficient because
 that csv was being loaded in every time the http server redirected a request to the origin server.
-Then the implementation changed to a time based LRU (i.e. if the file exists in the server, then the "last
-modified" date changes). The code for this was unnecessarily complicated, so we finally changed to
-using an OrderedDict() from python's `collections` module.
-- **dnsserver**: Understanding the headers and payload for DNS requests and responses was a major challenge. I used WireShark to interpret the UDP packets and determine how to make it work. Another challenge was to test the DNS and HTTP servers jointly. We could test it all separately, but we wanted to see how everything worked together. For this, we devised end-to-end testing in isolation (details in testing overview).
-- **[deploy,run,stop]CDN**: Most of the stuff with this scrips was pretty simple. However, one minor challenge was understanding the use of SSH to deploy and run remote commands, as well as becoming acquainted with Shell script.
+  - Then the implementation changed to a time based LRU (i.e. if the file exists in the server, then the "last modified" date changes). The code for this was unnecessarily complicated, so we finally changed to using an OrderedDict() from python's `collections` module.
+- **dnsserver**: 
+  - Understanding the headers and payload for DNS requests and responses was a major challenge. I used WireShark to interpret the UDP packets and determine how to make it work. 
+  - Another challenge was to test the DNS and HTTP servers jointly. We could test it all separately, but we wanted to see how everything worked together. For this, we devised end-to-end testing in isolation (details in testing overview).
+  - The ping was tricky to implemeted as we had to ping from http server and pass that information to the DNS server.
+  - Optimizing, DNS requesting was also a challege as the it depended on multiple API requests. But implemented small cache on DNS as map to persist this information and limit our API calls.
+- **[deploy,run,stop]CDN**: 
+  - Most of the stuff with this scrips was pretty simple. However, one minor challenge was understanding the use of SSH to deploy and run remote commands, as well as becoming acquainted with Shell script.
 
 # Work Breakdown
 - Ayush: 
