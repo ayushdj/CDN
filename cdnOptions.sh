@@ -61,4 +61,18 @@ replicas=(
 "cdn-http7.5700.network"
 )
 
+files=(
+  "Makefile"
+  "cdnOptions.sh"
+  "dnsserver"
+  "pageviews.csv"
+  "runCDN"
+  "utils.py"
+  "README.md"
+  "deployCDN"
+  "httpserver"
+  "populate_cache.py" 
+  "stopCDN"
+)
+
 ssh_options='-oBatchMode=yes -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oLogLevel=ERROR'

@@ -2,22 +2,25 @@
 The goal of this project is to build a Content Delivery Network (CDN) that can use DNS redirection to efficiently redirect clients to the replica server with the shortest response time. This will be accomplished by developing a basic Web server capable of handling client requests for content. In addition, the project will create a system that analyzes network performance data, server load data, and cached data on servers to determine the best replica server. The time it takes to download the content, which will typically consist of small files like most Web sites, will be used to measure performance.
 
 # Requirements
-- Python 3.8+
+- Python 3.10+ (Very important as we have used some features from Python 3.10. We went with 3.10 as its installed on given remote servers)
 - Unix Shell
 - SSH
+- Scamper
 - Dig (Testing)
 - WGet/Curl (Testing)
 - WireShark (Testing)
 
 # High Level Approach
 1. In Python, create a DNS server that can resolve an example CDN name and port. We will parse the incoming DNS question and then send answer in response by sending A type IP address.
-2. Ping each replica server to obtain latency and set resolve ip to the server with the lowest latency. (The resolved IP address is currently hardcoded.)
-3. Send refused response for all other DNS queries.
-4. In Python, create a simple HTTP server that will be served by all replica servers.
-5. The HTTP server will look in the cache directory for the request file. If it finds the file, it returns the cached file.
-6. If the requested file is not in cache, we retrieve it from the origin server. The server script will be given the hostname of the origin server. If the file is not found the we return 404.
-7. If the server is shut down, we will repopulate the cache based on the date the file was last modified. If the cache does not exist, we create a new directory and pre-populate it. And every time we access a file from the cache, we update the file's "last modified" attribute.
-8. We will also have Shell scripts to deploy, run and stop the CDN (i.e DNS and all replica HTTP servers)
+2. We will use geo location incoming IP address and HTTP server to determine closest HTTP server on DNS.
+3. We will also ping src ip from http server to calculate round trip time (RTT). Then we will call the RTT endpoint from DNS on all HTTP server to determine least RTT.
+4. The RTT logic will be used as fallback for geo location.
+5. Send refused response for all other DNS queries.
+6. In Python, create a simple HTTP server that will be served by all replica servers.
+7. The HTTP server will look in the cache directory for the request file. If it finds the file, it returns the cached file.
+8. If the requested file is not in cache, we retrieve it from the origin server. The server script will be given the hostname of the origin server. If the file is not found the we return 404.
+9. If the server is shut down, we will repopulate the cache based on the date the file was last modified. If the cache does not exist, we create a new directory and pre-populate it. And every time we access a file from the cache, we update the file's "last modified" attribute.
+10. We will also have Shell scripts to deploy, run and stop the CDN (i.e DNS and all replica HTTP servers)
 
 # Testing Overview
 The testing of the project was done in three parts, namely HTTP server, DNS server and End-to-End testing.
@@ -40,6 +43,7 @@ local machines, and the `wget` command was run. Once this was successful, it was
 dig @cdn-dns.5700.network -p 20200 -t A cs5700cdn.example.com
 ```
 - We also tested DNS server using dig with multiple input CDN name.
+- Testing dig with Surfshark VPN to check if DNS server was responding with appropriate IP.
 
 #### End-to-End
 An essential part of this project is end-to-end testing. We feel confident in the ability of our DNS and HTTP servers to work together as a result. End-to-end testing was carried out in isolation using following steps.
@@ -67,10 +71,16 @@ using an OrderedDict() from python's `collections` module.
 - **[deploy,run,stop]CDN**: Most of the stuff with this scrips was pretty simple. However, one minor challenge was understanding the use of SSH to deploy and run remote commands, as well as becoming acquainted with Shell script.
 
 # Work Breakdown
-- Ayush: Implemented the core functionality of `httpserver` and created utilities (util.py) for codebase.
-- Shubham: Implemented the `dnsserver`, the `[deploy,run,stop]CDN` shell scripts and end-to-end testing.
+- Ayush: 
+  - Implemented the core functionality of `httpserver` and created utilities (util.py) for codebase.
+- Shubham: 
+  - Implemented the `dnsserver` handling of question and responding with appropriate answer.
+  - Worked on optimizing cache on http server
+  - Handling geo location.
+  - the `[deploy,run,stop]CDN` shell scripts and end-to-end testing.
 
 # Reference
 1. Python documentation for `urllib`, `os`, `csv`, `collections` and `socketserver` modules.
 2. DNS query message format. Firewall.cx, Retrieved March 30, 2023, from https://www.firewall.cx/networking-topics/protocols/domain-name-system-dns/160-protocols-dns-query.html 
 3. DNS message format. GeeksforGeeks. Retrieved March 30, 2023, from https://www.geeksforgeeks.org/dns-message-format/ 
+4. Calculating distance between two geolocations in python. Medium. Retrieved April 13, 2023, from https://towardsdatascience.com/calculating-distance-between-two-geolocations-in-python-26ad3afe287b 
