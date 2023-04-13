@@ -32,19 +32,19 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
     def __init__(self, request: bytes, client_address: Tuple[str, int], server: socketserver.BaseServer):
         super().__init__(request, client_address, server)  # type: ignore
 
-    def _send_information_over(self, response_code, html_string):
+    def _send_information_over(self, response_code: int, data: bytes):
         """
         Helper method to send information to the client. Put this into a function because
         the contents of this function are used multiple times.
 
         Args:
             response_code: the response code to send over
-            html_string: the response message to send over.
+            data: the response message to send over.
         """
         self.send_response(response_code)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(bytes(html_string, "utf-8"))
+        self.wfile.write(data)
 
     def do_GET(self):
         """
@@ -57,31 +57,17 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
         filepath = self.path[1:]
         # send 204 if the path has "/grading/beacon"
         if filepath == 'grading/beacon':
-            self._send_information_over(204, '<html><body><h1>NO CONTENT.</h1></body></html>')
-            return
-
-        # send rtt time for input ip address
-        url_parts = self.path[1:].split('/')
-        if url_parts[0] == 'rtt':
-            src_ip = url_parts[1]
-            if is_valid_ip(src_ip):
-                rtt = get_rtt(src_ip)
-                self._send_information_over(200, str(rtt))
-            else:
-                self._send_information_over(400, '<html><body><h1>Invalid Request</h1></body></html>')
+            self._send_information_over(204, b'<html><body><h1>NO CONTENT.</h1></body></html>')
             return
 
         # if the file we're looking for exists in the disk cache, then pull the data
         # from there, otherwise go to the Origin server and pull the data from there.
         if f'{CACHE_DIRECTORY}/{filepath}' in ORDERED_CACHE_FILES:
             # open the file from the cache
-            # with open(f'{current_directory}/{CACHE_DIRECTORY}/{filepath}', 'r') as file:
-            #     file_lines = file.readlines()
             actual_file_content = ORDERED_CACHE_FILES[f'{CACHE_DIRECTORY}/{filepath}'][1]
-
-            # join the string list and send the data back out.
-            # joined_result = "".join(file_lines)
+            
             self._send_information_over(200, actual_file_content)
+            
             # add the data to the cache
             size, file_content = ORDERED_CACHE_FILES.pop(f'{CACHE_DIRECTORY}/{filepath}')
             ORDERED_CACHE_FILES[f'{CACHE_DIRECTORY}/{filepath}'] = (size, file_content)
@@ -101,14 +87,20 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                 # Extract the data from te origin server and the headers.
                 data = response.read()
                 headers = response.info()
-                result = data.decode()
                 # send the data over
-                self._send_information_over(response.status, result)
+                self._send_information_over(response.status, data)
 
         except Exception as e:
-            self._send_information_over(404, '<html><body><h1>Unble to retrieve data from the origin server. '
-                                             'Please request for the resource again.</h1></body></html>')
-            # ============================================================================================
+            not_found_response = b"""
+            <html>
+                <body>
+                    <h1>Unable to retrieve data from the origin server.
+                        Please request for the resource again.
+                    </h1>
+                </body><
+            /html>
+            """
+            self._send_information_over(404, not_found_response)
             return
 
         # exit if filepath is empty i.e, root / path.
