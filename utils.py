@@ -5,6 +5,7 @@ import math
 import socket
 import time
 import urllib.request
+import json
 from typing import Callable
 
 CACHE_DIRECTORY = 'bitbusters_cache'
@@ -176,23 +177,21 @@ def get_dist_between(ip1: str, ip2: str) -> float:
         return distance
     except Exception as exp:
         return -1
-
-def get_rtt(src_ip: str, dest_ip: str) -> float:
+    
+def get_rtt(ip: str) -> float:
     """
-    Get the round-trip time (RTT) between a source IP address 
-    and a destination IP address using the Scamper tool.
+    Get the round-trip time (RTT) using the Scamper tool.
 
     Args:
-        src_ip (str): The source IP address.
-        dest_ip (str): The destination IP address.
+        ip (str): The destination IP address.
 
     Returns:
         float: The average RTT in milliseconds, or -1 if the RTT could not be determined.
     """
-    ping_command = f"scamper -c \"ping -c 1\" -i {src_ip} {dest_ip} | grep -E -i '^(rtt|round-trip)'"
+    ping_command = f"scamper -c \"ping -c 1\" -i {ip} | grep -E -i '^(rtt|round-trip)'"
     try:
         stats = os.popen(ping_command).read()
-        print(dest_ip, ":", stats)
+        print(ip, ":", stats)
         if stats:
             min, avg, max, std_dev  = stats.split(" = ")[1].replace("ms", "").strip().split("/")
             return float(avg)
@@ -200,6 +199,26 @@ def get_rtt(src_ip: str, dest_ip: str) -> float:
     except:
         return -1
 
+def get_rtt_from_http(http_host: str, src_ip: str) -> float:
+    """
+    Sends an HTTP request to the specified host to get the round-trip time (RTT)
+    between the host and the source IP address.
+
+    Args:
+        http_host (str): The hostname or IP address of the host to send the request to.
+        src_ip (str): The source IP address to include in the request.
+
+    Returns:
+        float: The RTT in milliseconds, or -1 if there was an error.
+    """
+    url = f'http://{http_host}/rtt/{src_ip}'
+    req = urllib.request.Request(url)
+    with urllib.request.urlopen(req) as resp:
+        if resp.status == 200:
+            return float(resp.read().decode())
+        else:
+            return -1
+    
 def get_server_ip_address(host: str) -> str:
     """
     Get the IP address of a server given its hostname.

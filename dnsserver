@@ -226,7 +226,7 @@ class DNSServer:
                 and the response time in seconds.
             """
             http_server_ip = get_server_ip_address(http_server)
-            rtt = get_rtt(source_ip_address, http_server_ip)
+            rtt = get_rtt_from_http(f'{http_server_ip}:{self.port}', source_ip_address)
             return (http_server_ip, rtt)
         
         def dist(http_server: str):
@@ -261,6 +261,7 @@ class DNSServer:
             except:
                 tasks = [asyncio.to_thread(ping, x) for x in self.replica_servers]
                 responses = await asyncio.gather(*tasks)
+            print("responses", responses)
             http_server_ip, val = min(responses, key=lambda x: x[1])
             return http_server_ip
         

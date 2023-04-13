@@ -52,12 +52,21 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
         If the data we are looking for based on the path exists in our cache, then we send that data over. Otherwise,
         we send the data from the origin server.
         """
-        current_directory = get_current_directory()
 
         filepath = self.path[1:]
         # send 204 if the path has "/grading/beacon"
         if filepath == 'grading/beacon':
             self._send_information_over(204, b'<html><body><h1>NO CONTENT.</h1></body></html>')
+            return
+        
+        url_parts = self.path[1:].split('/')
+        if url_parts[0] == 'rtt':
+            src_ip = url_parts[1]
+            if is_valid_ip(src_ip):
+                rtt =  get_rtt(src_ip)
+                self._send_information_over(200, str(rtt).encode('utf-8'))
+            else:
+                self._send_information_over(400, b'<html><body><h1>Invalid Request</h1></body></html>')
             return
 
         # if the file we're looking for exists in the disk cache, then pull the data
