@@ -1,2 +1,3 @@
 .vscode
 bitbusters_cache/
+__pycache__/

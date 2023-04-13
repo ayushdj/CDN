@@ -106,8 +106,8 @@ class ReplicaHTTPServer(BaseHTTPRequestHandler):
                     <h1>Unable to retrieve data from the origin server.
                         Please request for the resource again.
                     </h1>
-                </body><
-            /html>
+                </body>
+            </html>
             """
             self._send_information_over(404, not_found_response)
             return
