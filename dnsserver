@@ -11,7 +11,6 @@ import asyncio
 import struct
 from typing import Optional, Tuple
 import asyncio
-import requests
 from utils import *
 
 
@@ -85,7 +84,15 @@ class DNSServer:
             if response:
                 # send the DNS response back to the client
                 self.udp_socket.sendto(response, source)
-
+        
+        # async def cron_coroutine():
+        #     while True:
+        #         time.sleep(30)
+        #         for k in self.closest_ip_address.keys():
+        #             self.closest_ip_address[k] = await self.find_closest_ip_address(k)
+                
+        # threading.Thread(target=lambda: asyncio.run(cron_coroutine())).start()
+                
         while True:
             # receive data from the UDP socket
             data = self.udp_socket.recvfrom(1024)
@@ -93,7 +100,7 @@ class DNSServer:
             if not data:
                 continue
             asyncio.run(dns_coroutine(data))
-
+    
     def close(self) -> None:
         """Close the UDP socket.
 
@@ -203,10 +210,11 @@ class DNSServer:
             A string representing the IP address of the closest HTTP server to 
             the source IP address.
         """
+            
         if source_ip_address in self.closest_ip_address:
             return self.closest_ip_address[source_ip_address]
         
-        async def ping(http_server: str):
+        def ping(http_server: str):
             """
             Asynchronously pings an HTTP server and returns the response time in seconds.
 
@@ -217,14 +225,11 @@ class DNSServer:
                 A tuple containing the IP address or hostname of the HTTP server 
                 and the response time in seconds.
             """
-            url = f'http://{http_server}:{self.port}/rtt/{source_ip_address}'
-            response = requests.get(url)
-            if response.status_code == 200:
-                return (http_server, float(response.text))
-            else:
-                return (http_server, -1)
+            http_server_ip = get_server_ip_address(http_server)
+            rtt = get_rtt(source_ip_address, http_server_ip)
+            return (http_server_ip, rtt)
         
-        async def dist(http_server: str):
+        def dist(http_server: str):
             """
             Asynchronously calculates the distance between an HTTP server 
             and a source IP address using a geolocation API.
@@ -237,8 +242,9 @@ class DNSServer:
                 A tuple containing the IP address or hostname of the 
                 HTTP server and the distance in meters.
             """
-            d = get_dist_between(http_server, source_ip_address)
-            return (http_server, d)
+            http_server_ip = get_server_ip_address(http_server)
+            d = get_dist_between(source_ip_address, http_server_ip)
+            return (http_server_ip, d)
 
         async def find_closest_http_server():
             """
@@ -249,13 +255,17 @@ class DNSServer:
                 A string representing the IP address of the closest HTTP server 
                 to the source IP address.
             """
-            tasks = [asyncio.create_task(dist(x)) for x in self.replica_servers]
-            responses = await asyncio.gather(*tasks)
+            try:
+                tasks = [asyncio.to_thread(dist, x) for x in self.replica_servers]
+                responses = await asyncio.gather(*tasks)
+            except:
+                tasks = [asyncio.to_thread(ping, x) for x in self.replica_servers]
+                responses = await asyncio.gather(*tasks)
             http_server_ip, val = min(responses, key=lambda x: x[1])
             return http_server_ip
         
-        res = await find_closest_http_server()
-        closest_ip = res if is_valid_ip(res) else socket.gethostbyname(res)
+        closest_ip = await find_closest_http_server()
+        # closest_ip = res if is_valid_ip(res) else socket.gethostbyname(res)
         self.closest_ip_address[source_ip_address] = closest_ip
         return closest_ip
 

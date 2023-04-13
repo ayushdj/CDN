@@ -7,8 +7,8 @@ dnsserver:
 	chmod +x ./dnsserver
 
 clean:
-	rm httpserver
-	rm -rf bitbusters_cache
+	rm -rf ./error.log
+	rm -rf ./bitbusters_cache
 
 default: httpserver dnsserver
 

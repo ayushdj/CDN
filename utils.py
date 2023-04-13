@@ -1,27 +1,13 @@
 import os
 import ipaddress
-import sys
-import requests
 import json
 import math
+import socket
 import time
-from typing import Callable, Optional
+import urllib.request
+from typing import Callable
 
 CACHE_DIRECTORY = 'bitbusters_cache'
-
-
-def get_rtt(hostname: str) -> float:
-    """This function calculates the Round Trip Time (RTT) to a given host using the ping command"""
-    # Ping the host and capture the output
-    ping_command = f"ping -c 1 -W 0.5 {hostname} | grep -E -i '^(rtt|round-trip)'"
-    stats = os.popen(ping_command).read()
-    # try:
-    if stats:
-        min, avg, max, std_dev  = stats.split(" = ")[1].replace("ms", "").strip().split("/")
-        return float(avg)
-    return -1
-    # except:
-    #     return -1
 
 def size_of_cache_directory():
     """
@@ -138,7 +124,8 @@ def get_dist_between(ip1: str, ip2: str) -> float:
     """
     Calculates the distance in meters between two IP addresses using 
     the haversine formula and the IP-API geolocation API.
-
+    Ref: https://towardsdatascience.com/calculating-distance-between-two-geolocations-in-python-26ad3afe287b
+    
     Args:
         ip1: A string representing the first IP address.
         ip2: A string representing the second IP address.
@@ -150,23 +137,24 @@ def get_dist_between(ip1: str, ip2: str) -> float:
     try:
         IP_API = 'http://ip-api.com/json/'
 
-        # Construct the API request URL
-        url = f'{IP_API}{ip1}'
-
         # Set up the HTTP headers
         headers = {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
         }
+        
+        def get_geo_ip(url):
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req) as resp:
+                return json.loads(resp.read().decode())
 
         # Make the first API request to get the location data for the first IP address
-        response1 = requests.get(url, headers=headers)
-        data1 = json.loads(response1.text)
+        url = f'{IP_API}{ip1}'
+        data1 = get_geo_ip(url)
 
         # Make the second API request to get the location data for the second IP address
         url = f'{IP_API}{ip2}'
-        response2 = requests.get(url, headers=headers)
-        data2 = json.loads(response2.text)
+        data2 = get_geo_ip(url)
 
         # Extract the latitude and longitude data from the location data for each IP address
         lat1 = data1['lat']
@@ -186,5 +174,40 @@ def get_dist_between(ip1: str, ip2: str) -> float:
 
         distance = R * c
         return distance
-    except Exception:
+    except Exception as exp:
         return -1
+
+def get_rtt(src_ip: str, dest_ip: str) -> float:
+    """
+    Get the round-trip time (RTT) between a source IP address 
+    and a destination IP address using the Scamper tool.
+
+    Args:
+        src_ip (str): The source IP address.
+        dest_ip (str): The destination IP address.
+
+    Returns:
+        float: The average RTT in milliseconds, or -1 if the RTT could not be determined.
+    """
+    ping_command = f"scamper -c \"ping -c 1\" -i {src_ip} {dest_ip} | grep -E -i '^(rtt|round-trip)'"
+    try:
+        stats = os.popen(ping_command).read()
+        print(dest_ip, ":", stats)
+        if stats:
+            min, avg, max, std_dev  = stats.split(" = ")[1].replace("ms", "").strip().split("/")
+            return float(avg)
+        return -1
+    except:
+        return -1
+
+def get_server_ip_address(host: str) -> str:
+    """
+    Get the IP address of a server given its hostname.
+
+    Args:
+        host (str): The hostname or IP address of the server.
+
+    Returns:
+        str: The IP address of the server.
+    """
+    return host if is_valid_ip(host) else socket.gethostbyname(host)

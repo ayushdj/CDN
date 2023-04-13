@@ -8,11 +8,17 @@ source $(dirname $0)/cdnOptions.sh
 # Helper function to deploy files to the given server server
 # Usage: deploy script hostname
 function deploy {
-    script=$1
-    hostname=$2
-    echo "Deploying to $hostname ..."
-    scp $ssh_options -i $keyfile -r $(dirname $0)/* $username@$hostname:/home/$username
-    ssh $ssh_options -i $keyfile $username@$hostname "make $script && rm -rf /home/$username/error.log"
+  script=$1
+  hostname=$2
+  echo "Deploying to $hostname ..."
+  mkdir ./pkg
+  for file in "${files[@]}"
+  do
+    cp $file ./pkg
+  done
+  scp $ssh_options -i $keyfile -r $(dirname $0)/pkg/* $username@$hostname:/home/$username
+  ssh $ssh_options -i $keyfile $username@$hostname "make $script"
+  rm -rf pkg
 }
 
 # Deploy files to the DNS server

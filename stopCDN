@@ -13,13 +13,28 @@ function stop_httpserver {
   ssh $ssh_options -i $keyfile $username@$hostname "kill \$(lsof -t -i :$port)"
 }
 
+# Helper function to delete all remote files
+# Usage: clean hostname
+function clean {
+  hostname=$1
+  ssh $ssh_options -i $keyfile $username@$hostname "make clean"
+  rm_arg=""
+  for file in "${files[@]}"
+  do
+    rm_arg+=" $file"
+  done
+  ssh $ssh_options -i $keyfile $username@$hostname "rm -rf $rm_arg"
+}
+
 # Stop the DNS server
 dns_hostname='cdn-dns.5700.network'
 echo "Stopping DNS server on $dns_hostname"
 ssh $ssh_options -i $keyfile $username@$dns_hostname "kill \$(lsof -t -i :$port)"
+clean $dns_hostname
 
 # Stop HTTP servers from the replicas array
 for value in "${replicas[@]}"
 do
   stop_httpserver $value
+  clean $value
 done
