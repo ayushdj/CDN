@@ -11,7 +11,7 @@ function run_httpserver {
   hostname=$1
   echo "Running HTTP server on $hostname"
   ssh $ssh_options -i $keyfile $username@$hostname "nohup ./httpserver -p $port -o $origin > /dev/null 2> /home/$username/error.log < /dev/null &"
-  ssh $ssh_options -i $keyfile $username@$hostname "python3 populate_cache.py -o $origin &"
+  ssh $ssh_options -i $keyfile $username@$hostname "python3 populate_cache.py -o $origin >/dev/null 2>&1 &"
 }
 
 # Start the DNS server

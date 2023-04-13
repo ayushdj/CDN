@@ -17,6 +17,7 @@ function stop_httpserver {
 # Usage: clean hostname
 function clean {
   hostname=$1
+  echo "Cleaning HTTP server on $hostname"
   ssh $ssh_options -i $keyfile $username@$hostname "make clean"
   rm_arg=""
   for file in "${files[@]}"
@@ -30,11 +31,21 @@ function clean {
 dns_hostname='cdn-dns.5700.network'
 echo "Stopping DNS server on $dns_hostname"
 ssh $ssh_options -i $keyfile $username@$dns_hostname "kill \$(lsof -t -i :$port)"
-clean $dns_hostname
 
 # Stop HTTP servers from the replicas array
 for value in "${replicas[@]}"
 do
   stop_httpserver $value
+done
+
+
+# Clean the DNS server
+dns_hostname='cdn-dns.5700.network'
+echo "Cleaning DNS server on $dns_hostname"
+clean $dns_hostname
+
+# Clean HTTP servers from the replicas array
+for value in "${replicas[@]}"
+do
   clean $value
 done
