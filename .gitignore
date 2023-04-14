@@ -3,3 +3,4 @@ bitbusters_cache/
 __pycache__/
 *.txt
 *.log
+pkg
