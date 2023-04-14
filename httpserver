@@ -144,6 +144,23 @@ def main(server_port_number: int):
     Args:
         server_port_number: the port number this http server is listening/sending on
     """
+    # create the cache directory if it doesn't exist, because this is where we
+    # store all the cached data.
+    if not os.path.exists(CACHE_DIRECTORY):
+        os.makedirs(CACHE_DIRECTORY)
+        with open('pageviews.csv', newline='') as csvfile:
+            CSV_READER = list(csv.DictReader(csvfile))
+            for current_row in CSV_READER:
+                current_row['article'] = current_row['article'].replace(' ', '_')
+                with urllib.request.urlopen(f"http://{ORIGIN_SERVER}/{current_row['article']}") as response:
+                    data = response.read()
+                    if int(size_of_cache_directory()) + len(data) <= DISK_SIZE_LIMIT:
+                        with open(f"{CACHE_DIRECTORY}/{current_row['article']}", 'wb') as file:
+                            # Write the content of the file to the file we're creating and close the file out.
+                            file.write(data)
+                            file.close()
+                    else:
+                        break
 
     # load files into the cache based on how recently they were modified
     cached_files = find_recently_modified_files()
