@@ -76,7 +76,10 @@ that csv was being loaded in every time the http server redirected a request to 
 
 # Work Breakdown
 - Ayush: 
-  - Implemented the core functionality of `httpserver` and created utilities (util.py) for codebase.
+  - Implemented the core functionality of `httpserver` 
+  - created utilities (util.py) for codebase. 
+  - Worked on `dnsserver` finding the closest http server to the client
+  - worked on populate_cache.py file for populating the cache with the most popular files from the pageviews.csv file, and part of the runCDN script to run the populate_cache.py script.
 - Shubham: 
   - Implemented the `dnsserver` handling of question and responding with appropriate answer.
   - Worked on optimizing cache on http server
