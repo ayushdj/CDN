@@ -9,6 +9,7 @@ import json
 from typing import Callable
 
 CACHE_DIRECTORY = 'bitbusters_cache'
+GEO_DATA = {}
 
 def size_of_cache_directory():
     """
@@ -133,35 +134,37 @@ def get_dist_between(ip1: str, ip2: str) -> float:
 
     Returns:
         A float representing the distance in meters between the 
-        two IP addresses, or -1 if an error occurs.
+        two IP addresses
     """
     try:
         IP_API = 'http://ip-api.com/json/'
-
-        # Set up the HTTP headers
-        headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        }
-        
         def get_geo_ip(url):
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req) as resp:
-                return json.loads(resp.read().decode())
-
+            if url in GEO_DATA:
+                lat, lon, ts = GEO_DATA[url]
+                if ts > 3600 and url in GEO_DATA:
+                    GEO_DATA.pop(ts)
+                return (lat, lon, ts)
+            with urllib.request.urlopen(url) as resp:
+                data = json.loads(resp.read().decode())
+                if data['status'] == 'success':
+                    result = (data['lat'], data['lon'], time.time())
+                    GEO_DATA[url] = result
+                    return result
+                return None
+        
         # Make the first API request to get the location data for the first IP address
         url = f'{IP_API}{ip1}'
         data1 = get_geo_ip(url)
+        if not data1:
+            return float('inf')
+        lat1, lon1, ts = data1
 
         # Make the second API request to get the location data for the second IP address
         url = f'{IP_API}{ip2}'
         data2 = get_geo_ip(url)
-
-        # Extract the latitude and longitude data from the location data for each IP address
-        lat1 = data1['lat']
-        lon1 = data1['lon']
-        lat2 = data2['lat']
-        lon2 = data2['lon']
+        if not data2:
+            return float('inf')
+        lat2, lon2, ts = data2
 
         # Calculate the distance between the two locations using the haversine formula
         R = 6371e3
@@ -174,9 +177,11 @@ def get_dist_between(ip1: str, ip2: str) -> float:
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
         distance = R * c
+    
         return distance
+    
     except Exception as exp:
-        return -1
+        return float('inf')
     
 def get_rtt(ip: str) -> float:
     """
@@ -186,18 +191,17 @@ def get_rtt(ip: str) -> float:
         ip (str): The destination IP address.
 
     Returns:
-        float: The average RTT in milliseconds, or -1 if the RTT could not be determined.
+        float: The average RTT in milliseconds.
     """
     ping_command = f"scamper -c \"ping -c 1\" -i {ip} | grep -E -i '^(rtt|round-trip)'"
     try:
         stats = os.popen(ping_command).read()
-        print(ip, ":", stats)
         if stats:
             min, avg, max, std_dev  = stats.split(" = ")[1].replace("ms", "").strip().split("/")
             return float(avg)
-        return -1
+        raise Exception("Invalid stats")
     except:
-        return -1
+        return float('inf')
 
 def get_rtt_from_http(http_host: str, src_ip: str) -> float:
     """
@@ -209,7 +213,7 @@ def get_rtt_from_http(http_host: str, src_ip: str) -> float:
         src_ip (str): The source IP address to include in the request.
 
     Returns:
-        float: The RTT in milliseconds, or -1 if there was an error.
+        float: The RTT in milliseconds.
     """
     url = f'http://{http_host}/rtt/{src_ip}'
     req = urllib.request.Request(url)
@@ -217,7 +221,7 @@ def get_rtt_from_http(http_host: str, src_ip: str) -> float:
         if resp.status == 200:
             return float(resp.read().decode())
         else:
-            return -1
+            return float('inf')
     
 def get_server_ip_address(host: str) -> str:
     """

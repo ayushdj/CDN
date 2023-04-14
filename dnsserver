@@ -210,11 +210,10 @@ class DNSServer:
             A string representing the IP address of the closest HTTP server to 
             the source IP address.
         """
-            
         if source_ip_address in self.closest_ip_address:
             return self.closest_ip_address[source_ip_address]
         
-        def ping(http_server: str):
+        async def ping(http_server: str):
             """
             Asynchronously pings an HTTP server and returns the response time in seconds.
 
@@ -229,7 +228,7 @@ class DNSServer:
             rtt = get_rtt_from_http(f'{http_server_ip}:{self.port}', source_ip_address)
             return (http_server_ip, rtt)
         
-        def dist(http_server: str):
+        async def dist(http_server: str):
             """
             Asynchronously calculates the distance between an HTTP server 
             and a source IP address using a geolocation API.
@@ -255,19 +254,24 @@ class DNSServer:
                 A string representing the IP address of the closest HTTP server 
                 to the source IP address.
             """
+            
+            async def run_tasks(func):
+                tasks = [asyncio.create_task(func(x)) for x in self.replica_servers]
+                responses = await asyncio.gather(*tasks)
+                return responses
+            
             try:
-                tasks = [asyncio.to_thread(dist, x) for x in self.replica_servers]
-                responses = await asyncio.gather(*tasks)
+                responses = await run_tasks(dist)
             except:
-                tasks = [asyncio.to_thread(ping, x) for x in self.replica_servers]
-                responses = await asyncio.gather(*tasks)
-            print("responses", responses)
+                responses = await run_tasks(ping)
+                
             http_server_ip, val = min(responses, key=lambda x: x[1])
-            return http_server_ip
+            return http_server_ip, val
         
-        closest_ip = await find_closest_http_server()
+        closest_ip, val = await find_closest_http_server()
         # closest_ip = res if is_valid_ip(res) else socket.gethostbyname(res)
-        self.closest_ip_address[source_ip_address] = closest_ip
+        if val != float('inf'):
+            self.closest_ip_address[source_ip_address] = closest_ip
         return closest_ip
 
     def create_answer_packet(self, resolved_ip_address: str, query: bytes,

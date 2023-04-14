@@ -6,9 +6,6 @@ The goal of this project is to build a Content Delivery Network (CDN) that can u
 - Unix Shell
 - SSH
 - Scamper
-- Dig (Testing)
-- WGet/Curl (Testing)
-- WireShark (Testing)
 
 # High Level Approach
 1. In Python, create a DNS server that can resolve an example CDN name and port. We will parse the incoming DNS question and then send answer in response by sending A type IP address.
@@ -21,6 +18,12 @@ The goal of this project is to build a Content Delivery Network (CDN) that can u
 8. If the requested file is not in cache, we retrieve it from the origin server. The server script will be given the hostname of the origin server. If the file is not found the we return 404.
 9. If the server is shut down, we will repopulate the cache based on the date the file was last modified. If the cache does not exist, we create a new directory and pre-populate it. And every time we access a file from the cache, we update the file's "last modified" attribute.
 10. We will also have Shell scripts to deploy, run and stop the CDN (i.e DNS and all replica HTTP servers)
+
+# Testing Tools
+- Dig
+- WGet/Curl
+- WireShark
+- Surfshark VPN
 
 # Testing Overview
 The testing of the project was done in three parts, namely HTTP server, DNS server and End-to-End testing.
@@ -78,16 +81,19 @@ that csv was being loaded in every time the http server redirected a request to 
 - Ayush: 
   - Implemented the core functionality of `httpserver` 
   - created utilities (util.py) for codebase. 
-  - Worked on `dnsserver` finding the closest http server to the client
-  - worked on populate_cache.py file for populating the cache with the most popular files from the pageviews.csv file, and part of the runCDN script to run the populate_cache.py script.
+  - Worked on `dnsserver` finding the closest http server to the client using ping.
+  - worked on populate_cache.py file for populating the cache with the most popular files from the pageviews.csv file, and part of the `runCDN` script to run the populate_cache.py script.
 - Shubham: 
   - Implemented the `dnsserver` handling of question and responding with appropriate answer.
-  - Worked on optimizing cache on http server
-  - Handling geo location.
-  - the `[deploy,run,stop]CDN` shell scripts and end-to-end testing.
+  - Worked on optimizing cache on http server.
+  - Added utilities like process monitor, rtt, and more.
+  - Working on DNS name resolution using geo location.
+  - The `[deploy,run,stop]CDN` shell scripts, fixes and end-to-end testing.
 
 # Reference
 1. Python documentation for `urllib`, `os`, `csv`, `collections` and `socketserver` modules.
 2. DNS query message format. Firewall.cx, Retrieved March 30, 2023, from https://www.firewall.cx/networking-topics/protocols/domain-name-system-dns/160-protocols-dns-query.html 
 3. DNS message format. GeeksforGeeks. Retrieved March 30, 2023, from https://www.geeksforgeeks.org/dns-message-format/ 
 4. Calculating distance between two geolocations in python. Medium. Retrieved April 13, 2023, from https://towardsdatascience.com/calculating-distance-between-two-geolocations-in-python-26ad3afe287b 
+5. Geolocation API - documentation. IP. Retrieved April 13, 2023, from https://ip-api.com/docs 
+6. Ubuntu Manpage: Scamper - parallel internet measurement utility. Retrieved April 13, 2023, from https://manpages.ubuntu.com/manpages/bionic/man1/scamper.1.html 
