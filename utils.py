@@ -140,9 +140,11 @@ def get_dist_between(ip1: str, ip2: str) -> float:
         IP_API = 'http://ip-api.com/json/'
         def get_geo_ip(url):
             if url in GEO_DATA:
+                # print("GEO_DATA: ", url, GEO_DATA)
                 lat, lon, ts = GEO_DATA[url]
-                if ts > 3600 and url in GEO_DATA:
-                    GEO_DATA.pop(ts)
+                age = time.time() - ts
+                if 3600 < age and url in GEO_DATA:
+                    GEO_DATA.pop(url)
                 return (lat, lon, ts)
             with urllib.request.urlopen(url) as resp:
                 data = json.loads(resp.read().decode())
@@ -157,11 +159,13 @@ def get_dist_between(ip1: str, ip2: str) -> float:
         data1 = get_geo_ip(url)
         if not data1:
             return float('inf')
+        # print("🚀 ~ file: utils.py:165 ~ data2:", ip1, data1)
         lat1, lon1, ts = data1
 
         # Make the second API request to get the location data for the second IP address
         url = f'{IP_API}{ip2}'
         data2 = get_geo_ip(url)
+        # print("🚀 ~ file: utils.py:165 ~ data2:", ip2, data2)
         if not data2:
             return float('inf')
         lat2, lon2, ts = data2
