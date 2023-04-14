@@ -13,7 +13,7 @@ GEO_DATA = {}
 
 def size_of_cache_directory():
     """
-    Helper function to determine the size of the cache directory. This is needed
+    Helper function to determine the size of the cache directory.
 
     Returns:
          An integer representing the size of the directory
@@ -27,7 +27,7 @@ def size_of_cache_directory():
 
 def get_current_directory() -> str:
     """
-    Helper function to determine the current working directory in the system
+    Helper function to determine the current working directory in the system.
 
     Return:
             A string representing the current working directory
