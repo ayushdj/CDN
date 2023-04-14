@@ -13,7 +13,6 @@ from typing import Tuple
 import urllib.request
 from utils import *
 import os
-import csv
 from collections import OrderedDict
 import time
 
